@@ -4,7 +4,7 @@ Tags: avenra, halo, motorcycle, pwa, customer-portal
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.7.1
+Stable tag: 2.7.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -59,7 +59,7 @@ The plugin does not replace, edit or redirect the existing `/halo-app/` page.
 * Confirm the existing `avenra_customers` and `avenra_orders` tables are present and current.
 * Confirm `wp_mail` can deliver the short-lived registration code, or connect the registration-code delivery filter.
 * Connect the route-planning, account-recovery, alert-delivery and checkout integration hooks used by the installation.
-* Configure the server-only FireText key, verify both Emergency Assist responder devices, test Guardian rider-notification fallback and run the documented staged acceptance exercise before enabling rider consent.
+* Configure the server-only FireText key, verify both Emergency Assist responder devices, test Guardian rider-notification fallback and run the documented staged acceptance exercise before enabling rider consent. The same key delivers the rider's next-of-kin test alert and crash notification; confirm a test alert reaches a real handset before launch.
 * In WebToNative, enable Background Location and JavaScript Bridge Access for the exact production Halo origin, allow camera access, then save and rebuild both app binaries. Halo does not use the Background App As Service/socket add-on.
 * Test Ride Memories on each supported browser/WebView. It needs no WordPress SQL table or server media directory: IndexedDB is created inside the Halo origin on the rider's device. Confirm browser data-retention policy, available quota, synchronized front-and-rear playback, truthful single-decoder fallback, canvas/MediaRecorder encoding and native file-bridge delivery before launch.
 * Test Camera alignment check on every supported mounted phone and WebView. Verify the full uncropped road-facing and rider-facing frames, dual preview or truthful sequential fallback, permission denial, immediate shutdown on close/background/account change and clean camera hand-off into Ride mode. The rider must remain stationary while checking or adjusting the mount.
@@ -104,6 +104,12 @@ Browser-private storage is origin/profile scoped, not application-encrypted stor
 Halo Community is disabled until a rider explicitly joins. Its public identity is limited to a rider-chosen username and optional bio; customer identity, motorcycles, rides, locations, Emergency Assist information and ride-risk indicators are not exposed through Community. Direct messages are stored by Halo and are not end-to-end encrypted. See `docs/COMMUNITY.md` before launch.
 
 == Changelog ==
+
+= 2.7.2 =
+* Fixed false crash detections during normal riding. A possible crash now needs a sustained impact across several motion samples while a fresh GPS fix shows the bike moving, and then confirmation from an abrupt stop, a sustained tip-over or a severe impact; a single sensor spike, a bump followed by ordinary braking to a halt, or a stale speed from a lost GPS signal can no longer start the 20-second countdown.
+* Crash detection now measures gravity-removed g on every device, discards an impact when the rider keeps riding, and waits 60 seconds after a rider cancels before it can ask again.
+* Fixed the next-of-kin "Send test alert" button, and next-of-kin crash notifications, failing with "temporarily unavailable" on sites without the V1 theme handlers. Halo now sends these messages itself through the configured FireText key or SMS delivery filter and only falls back to the V1 bridge when it cannot send SMS.
+* Reported a missing next-of-kin alert provider as a configuration error instead of a temporary outage.
 
 = 2.7.1 =
 * Added a polished `?install=1` website hand-off that opens Halo's own installer and keeps the browser installation prompt behind an explicit rider tap.

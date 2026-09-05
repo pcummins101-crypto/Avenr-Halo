@@ -3,7 +3,7 @@
  * Plugin Name: Avenrà Halo V2
  * Plugin URI:  https://rideavenra.com/
  * Description: A dedicated, mobile-first Halo owner application. Halo V2 runs alongside the existing Halo page and uses the established Avenrà customer and order records.
- * Version:     2.7.1
+ * Version:     2.7.2
  * Author:      Ampera EV Ltd
  * Text Domain: avenra-halo-v2
  * Requires at least: 6.3
@@ -12,7 +12,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'AVENRA_HALO_V2_VERSION', '2.7.1' );
+define( 'AVENRA_HALO_V2_VERSION', '2.7.2' );
 define( 'AVENRA_HALO_V2_FILE', __FILE__ );
 define( 'AVENRA_HALO_V2_DIR', plugin_dir_path( __FILE__ ) );
 define( 'AVENRA_HALO_V2_URL', plugin_dir_url( __FILE__ ) );

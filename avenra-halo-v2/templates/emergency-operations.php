@@ -7,7 +7,7 @@ $mode            = sanitize_key( (string) ( $halo_operations['mode'] ?? 'unavail
 $config          = is_array( $halo_operations['config'] ?? null ) ? $halo_operations['config'] : array();
 $csp_nonce       = sanitize_text_field( (string) ( $halo_operations['csp_nonce'] ?? '' ) );
 $logo            = esc_url( (string) ( $halo_operations['logo'] ?? '' ) );
-$asset_version   = defined( 'AVENRA_HALO_V2_VERSION' ) ? AVENRA_HALO_V2_VERSION : '2.7.1';
+$asset_version   = defined( 'AVENRA_HALO_V2_VERSION' ) ? AVENRA_HALO_V2_VERSION : '2.7.2';
 $gate_title_id   = 'halo-gate-title-' . $mode;
 ?><!doctype html>
 <html <?php language_attributes(); ?>>

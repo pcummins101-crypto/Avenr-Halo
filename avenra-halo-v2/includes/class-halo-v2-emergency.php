@@ -1581,6 +1581,129 @@ final class Avenra_Halo_V2_Emergency {
 			'test_dispatch_mode' => $is_test ? sanitize_key( (string) ( $incident->test_dispatch_mode ?? '' ) ) : '',
 		);
 
+		return $this->send_sms( $destination, $message, $context );
+	}
+
+	/**
+	 * Whether Halo can deliver an SMS itself, either through the configured
+	 * delivery filter or the built-in FireText adapter.
+	 */
+	public function sms_configured(): bool {
+		if ( has_filter( 'avenra_halo_v2_emergency_sms_delivery' ) ) {
+			return true;
+		}
+		return defined( 'AVENRA_FIRETEXT_API_KEY' ) && '' !== trim( (string) AVENRA_FIRETEXT_API_KEY );
+	}
+
+	/**
+	 * Built-in next-of-kin SMS for the rider's saved emergency contact.
+	 *
+	 * Halo previously relied entirely on the V1 theme's admin-ajax handlers for
+	 * the "Send test alert" button and for crash notifications to the next of
+	 * kin. Where that theme is absent or its session bridge fails, every test
+	 * ended in "temporarily unavailable" even though the same FireText adapter
+	 * that alerts responders was configured. This method sends the message
+	 * through that adapter (or the `avenra_halo_v2_emergency_sms_delivery`
+	 * filter) and reports acceptance truthfully.
+	 *
+	 * @param string              $kind     'test' or 'crash'.
+	 * @param array<string,mixed> $payload  Alert payload (lat, lng, occurred_at, event_id...).
+	 * @param object              $customer Rider record including nok_* columns.
+	 * @return array<string,mixed>|WP_Error
+	 */
+	public function send_next_of_kin_sms( string $kind, array $payload, object $customer ): array|WP_Error {
+		$kind        = 'crash' === $kind ? 'crash' : 'test';
+		$destination = $this->normalise_mobile( (string) ( $customer->nok_mobile ?? '' ) );
+		if ( '' === $destination ) {
+			return new WP_Error( 'nok_mobile_invalid', __( 'The saved next-of-kin mobile number is not a valid mobile number.', 'avenra-halo-v2' ), array( 'retryable' => false ) );
+		}
+		if ( ! $this->sms_configured() ) {
+			return new WP_Error( 'alert_provider_not_configured', __( 'The next-of-kin alert service is not configured on this site.', 'avenra-halo-v2' ), array( 'retryable' => false ) );
+		}
+
+		$rider = $this->object_value( $customer, array( 'full_name', 'name', 'first_name' ) );
+		$rider = '' !== $rider ? $rider : __( 'An Avenra rider', 'avenra-halo-v2' );
+		$rider = $this->text( $rider, 60 );
+		$lat   = $this->coordinate( $payload['lat'] ?? $payload['latitude'] ?? null, -90, 90 );
+		$lng   = $this->coordinate( $payload['lng'] ?? $payload['longitude'] ?? null, -180, 180 );
+		$map   = null !== $lat && null !== $lng
+			? 'https://maps.google.com/?q=' . number_format( $lat, 5, '.', '' ) . ',' . number_format( $lng, 5, '.', '' )
+			: '';
+
+		$occurred = $payload['occurred_at'] ?? null;
+		$time     = is_string( $occurred ) && '' !== trim( $occurred ) ? strtotime( $occurred ) : false;
+		$time     = false === $time || $time < 1 ? time() : $time;
+		$when     = wp_date( 'H:i', $time ) . ' ' . __( 'on', 'avenra-halo-v2' ) . ' ' . wp_date( 'j M', $time );
+
+		if ( 'test' === $kind ) {
+			$message = sprintf(
+				/* translators: 1: rider name, 2: time */
+				__( 'Avenra Halo TEST alert: %1$s sent this test of their emergency-contact alert at %2$s. This is only a test. No accident has happened and no action is needed.', 'avenra-halo-v2' ),
+				$rider,
+				$when
+			);
+			if ( '' !== $map ) {
+				$message .= ' ' . __( 'Their location when testing:', 'avenra-halo-v2' ) . ' ' . $map;
+			}
+		} else {
+			$message = sprintf(
+				/* translators: 1: rider name, 2: time */
+				__( 'Avenra Halo alert: %1$s may have been involved in a motorcycle incident at %2$s. Their Avenra Halo app sent an incident alert from their phone.', 'avenra-halo-v2' ),
+				$rider,
+				$when
+			);
+			if ( '' !== $map ) {
+				$message .= ' ' . __( 'Last known location:', 'avenra-halo-v2' ) . ' ' . $map;
+			}
+			$message .= ' ' . __( 'Please try to contact them now.', 'avenra-halo-v2' );
+			if ( ! empty( $payload['emergency_services_called_at'] ) ) {
+				$message .= ' ' . __( 'A responder has confirmed that 999 has been contacted.', 'avenra-halo-v2' );
+			} else {
+				$message .= ' ' . __( 'If you cannot reach them and believe they are hurt, call 999.', 'avenra-halo-v2' );
+			}
+		}
+		$message = $this->text( wp_strip_all_tags( $message ), 480 );
+
+		$context = array(
+			'role'        => 'next_of_kin',
+			'kind'        => $kind,
+			'destination' => $destination,
+			'message'     => $message,
+			'customer_id' => (int) ( $customer->id ?? 0 ),
+			'event_id'    => sanitize_text_field( (string) ( $payload['event_id'] ?? '' ) ),
+			'is_test'     => 'test' === $kind,
+		);
+		$result = $this->send_sms( $destination, $message, $context );
+		if ( 'accepted' === $result['state'] ) {
+			return array(
+				'sent'                => true,
+				'success'             => true,
+				'accepted'            => true,
+				'provider'            => $result['provider'],
+				'provider_message_id' => $result['provider_message_id'],
+				'destination_last_four' => substr( $destination, -4 ),
+				'kind'                => $kind,
+			);
+		}
+		if ( 'provider_not_configured' === $result['safe_code'] ) {
+			return new WP_Error( 'alert_provider_not_configured', __( 'The next-of-kin alert service is not configured on this site.', 'avenra-halo-v2' ), array( 'retryable' => false, 'safe_code' => $result['safe_code'] ) );
+		}
+		if ( 'unknown' === $result['state'] || ! $result['definitive'] ) {
+			return new WP_Error( 'alert_provider_unconfirmed', __( 'The next-of-kin alert service did not confirm the message. Please try again.', 'avenra-halo-v2' ), array( 'retryable' => true, 'safe_code' => $result['safe_code'] ) );
+		}
+		return new WP_Error( 'alert_provider_failed', __( 'The next-of-kin alert service did not accept the message.', 'avenra-halo-v2' ), array( 'retryable' => true, 'safe_code' => $result['safe_code'] ) );
+	}
+
+	/**
+	 * Shared SMS transport: the delivery filter first, then FireText.
+	 *
+	 * @param array<string,mixed> $context
+	 * @return array{state:string,definitive:bool,provider:string,provider_message_id:string,safe_code:string}
+	 */
+	private function send_sms( string $destination, string $message, array $context ): array {
+		if ( '' === $destination || '' === trim( $message ) ) {
+			return $this->delivery_result( 'failed', true, 'unavailable', '', 'destination_unavailable' );
+		}
 		try {
 			$override = apply_filters( 'avenra_halo_v2_emergency_sms_delivery', null, $context );
 		} catch ( Throwable $error ) {
@@ -2435,6 +2558,18 @@ final class Avenra_Halo_V2_Emergency {
 		if ( is_array( $result ) ) {
 			$accepted = true === ( $result['accepted'] ?? null ) || true === ( $result['sent'] ?? null ) || true === ( $result['success'] ?? null );
 			$code     = $accepted ? 'accepted' : sanitize_key( (string) ( $result['code'] ?? 'provider_rejected' ) );
+		} elseif ( null === $result && $this->use_built_in_nok_sms() ) {
+			try {
+				$result = $this->send_next_of_kin_sms( 'crash', $payload, $customer );
+			} catch ( Throwable $error ) {
+				$result = new WP_Error( 'nok_provider_exception' );
+			}
+			if ( is_array( $result ) ) {
+				$accepted = true === ( $result['accepted'] ?? null );
+				$code     = $accepted ? 'accepted' : 'provider_rejected';
+			} else {
+				$code = sanitize_key( $result->get_error_code() ) ?: 'provider_unavailable';
+			}
 		} elseif ( null === $result ) {
 			try {
 				$result = Avenra_Halo_V2_Legacy_Bridge::instance()->dispatch( 'send_nok_crash_alert_v2', $payload, (int) $incident->customer_id );
@@ -3335,6 +3470,22 @@ final class Avenra_Halo_V2_Emergency {
 			'acknowledged_at'    => $this->rfc3339( $incident->first_acknowledged_at ?? null ),
 			'resolved_at'        => $this->rfc3339( $incident->resolved_at ?? null ),
 		);
+	}
+
+	/**
+	 * The built-in next-of-kin SMS is used whenever Halo can send SMS itself.
+	 * A site that still wants the V1 admin-ajax handlers to own next-of-kin
+	 * messages can return true from `avenra_halo_v2_prefer_legacy_nok_alerts`.
+	 */
+	public function use_built_in_nok_sms(): bool {
+		if ( ! $this->sms_configured() ) {
+			return false;
+		}
+		try {
+			return ! (bool) apply_filters( 'avenra_halo_v2_prefer_legacy_nok_alerts', false );
+		} catch ( Throwable $error ) {
+			return true;
+		}
 	}
 
 	private function is_test_incident( object $incident ): bool {

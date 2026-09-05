@@ -42,8 +42,8 @@ function between(source, start, end) {
 }
 
 test('ships the current schema required for one-ride monitoring', () => {
-	assert.match(pluginSource, /\* Version:\s+2\.7\.1/);
-	assert.match(pluginSource, /AVENRA_HALO_V2_VERSION',\s*'2\.7\.1'/);
+	assert.match(pluginSource, /\* Version:\s+2\.7\.2/);
+	assert.match(pluginSource, /AVENRA_HALO_V2_VERSION',\s*'2\.7\.2'/);
 
 	const liveSchema = between(databaseSource, "$self->table( 'live_tracking' )", "$self->table( 'native_ride_sessions' )");
 	for (const column of [

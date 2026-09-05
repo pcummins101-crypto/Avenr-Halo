@@ -28,9 +28,21 @@ An unused arm expires after two hours. An active session ends when Ride mode end
 
 GPS locates the rider's phone. A linked customer motorcycle must not be presented as the physical demonstrator unless the operational handover process has independently verified that bike. Test rides are stored with a test ride mode so they do not affect the rider's persistent ride-risk indicator.
 
+## Crash detection
+
+Detection runs on the phone inside Ride mode and never from a single sensor reading. The ride engine works in gravity-removed ("dynamic") g so that a phone at rest reads 0 g whichever motion vector the device exposes, and it declares a possible crash only after two stages:
+
+1. **Sustained impact while moving.** The most recent GPS fix must be under eight seconds old and show at least 15 mph, and at least three motion samples within 400 ms must reach 60% of the 4 g threshold with the peak at or above it. Handlebar vibration, potholes and kerbs routinely produce one-sample spikes far above 4 g; they are ignored. Nothing is shown to the rider at this stage.
+2. **Confirmation from what the bike did next**, within a 12-second assessment window:
+   - the bike stops (two consecutive GPS fixes at 5 mph or less) and the stop was abrupt: an average deceleration of at least 10 mph per second from the impact speed, which is far harder than braking for a junction; or
+   - the phone stays tipped past 55° from its ride baseline for two seconds while the bike is stopped or GPS is lost; or
+   - the impact was severe (8 g or more) and the bike then stops, or no GPS fix at all arrives during the window.
+
+An impact is discarded quietly when the rider is still travelling at 12 mph or more four seconds later, when the stop was a gradual one, or when the window lapses with no confirmation. After a rider cancels a countdown, detection stays suppressed for 60 seconds so the same rough stretch cannot ask again straight away. The incident record carries the impact speed, peak dynamic g, the number of samples that formed the impact and the confirmation rule that fired.
+
 ## Live sequence
 
-1. Ride mode detects a possible high-energy impact and opens a full-screen 20-second cancellation state.
+1. Ride mode detects a possible high-energy impact, confirms it as above and opens a full-screen 20-second cancellation state.
 2. When separately enabled, the foreground incident camera freezes its audio-free, memory-only rolling buffer. No footage is uploaded during the cancellation window. Camera capture is unavailable while Halo is hidden.
 3. Halo records an encrypted candidate incident with a durable server deadline. Candidate rows are not actionable or shown as live incidents to responders.
 4. A cancellation that wins the activation race closes the candidate, immediately redacts its rich snapshot, destroys the frozen camera buffer and contacts nobody. At the deadline, or when the rider chooses **Send alert now**, the server atomically activates one incident and submits a short SMS to the primary responder.
@@ -54,6 +66,16 @@ define( 'AVENRA_FIRETEXT_API_KEY', 'replace-with-the-live-server-key' );
 The adapter submits to FireText's HTTPS `sendsms` endpoint and treats only status `0` as accepted. The default sender is `Avenra`. An installation can replace the adapter with the `avenra_halo_v2_emergency_sms_delivery` filter, but it must return success only after a provider has accepted the message.
 
 The packaged responder destinations are the requested primary ending **7559** and fallback ending **2606**. Keep both devices on a tested, documented 24/7 rota. The software cannot establish staffing coverage by itself.
+
+## Next-of-kin alerts
+
+The rider's **Send test alert** button and the next-of-kin crash notification use the same transport as responder SMS. Order of precedence:
+
+1. The `avenra_halo_v2_safety_alert_result` filter, when a site integration returns a result.
+2. Halo's built-in next-of-kin SMS, whenever `AVENRA_FIRETEXT_API_KEY` is defined or `avenra_halo_v2_emergency_sms_delivery` is hooked. The delivery filter receives `role` set to `next_of_kin` and `kind` set to `test` or `crash`.
+3. The V1 admin-ajax bridge (`send_test_nok_alert` / `send_nok_crash_alert_v2`), only when Halo cannot send SMS itself or the site returns `true` from `avenra_halo_v2_prefer_legacy_nok_alerts`.
+
+The test message is explicitly marked as a test, names the rider and includes their current map position. It is sent only when the rider has saved a valid mobile number for their next of kin and has enabled next-of-kin alerts. A missing provider is reported as `alert_provider_not_configured` (not retryable) rather than as a temporary outage, so the operations team can tell configuration from transport failure. Responder-triggered next-of-kin notifications during a live incident still require a recorded 999 call and remain blocked for every test exercise.
 
 ## Fifteen-second fallback
 

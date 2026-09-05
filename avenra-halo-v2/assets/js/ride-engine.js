@@ -177,7 +177,26 @@
                 gpsTimeout: 15000,
                 maximumAge: 1000,
                 maxAccuracyMetres: 100,
-                crashGThreshold: 2.5,
+                /* Crash detection. Every value below is in gravity-removed
+                 * ("dynamic") g. A crash is never declared from one sensor
+                 * sample: an impact must be sustained across several samples
+                 * and then confirmed by what happens to the bike afterwards. */
+                crashGThreshold: 4,
+                crashImpactSustainRatio: 0.6,
+                crashImpactMinSamples: 3,
+                crashImpactWindowMs: 400,
+                crashSevereGMultiplier: 2,
+                crashMinSpeedMph: 15,
+                crashStopSpeedMph: 5,
+                crashStopConfirmFixes: 2,
+                crashAbruptDecelerationMphPerSecond: 10,
+                crashResumeGraceMs: 4000,
+                crashResumeSpeedMph: 12,
+                crashTipOverDegrees: 55,
+                crashTipOverHoldMs: 2000,
+                crashConfirmWindowMs: 12000,
+                crashSpeedFreshnessMs: 8000,
+                crashRiderCancelCooldownMs: 60000,
                 crashCountdownSeconds: 20,
                 maxTrackPoints: 12000,
                 persistEveryPoints: 8,
@@ -228,6 +247,8 @@
             this.zeroToSixtyStartedAt = null;
             this.bestZeroToSixty = null;
             this.pendingImpact = null;
+            this.recentMotion = [];
+            this.crashSuppressedUntil = 0;
             this.crashTimer = null;
             this.crashSeconds = 0;
             this.crashDeadline = 0;
@@ -372,8 +393,10 @@
             if (!values) return;
             const gForce = Math.sqrt(values[0] ** 2 + values[1] ** 2 + values[2] ** 2) / 9.80665;
             // DeviceMotion may expose either linear acceleration or a vector
-            // containing gravity. Store a comparable dynamic value for the ride
-            // summary while preserving the raw resultant used by crash detection.
+            // containing gravity. Crash detection and the ride summary both use
+            // the gravity-removed dynamic value so that a phone at rest reads 0 g
+            // whichever vector the device provides; the raw resultant is kept for
+            // the incident record only.
 			const dynamicG = usingLinear ? gForce : Math.abs(gForce - 1);
 			const sampledAt = Date.now();
 			this.motionSamples += 1;
@@ -392,16 +415,58 @@
                 intervalMs: rounded(event.interval, 1),
                 at: sampledAt,
             };
-            if (gForce < this.options.crashGThreshold || this.currentSpeed < 15) return;
+            this.recordMotionSample(dynamicG, sampledAt);
+            if (this.pendingImpact) {
+                // Keep the strongest reading of the impact that is being assessed.
+                if (dynamicG > this.pendingImpact.gForce) {
+                    this.pendingImpact.gForce = dynamicG;
+                    this.pendingImpact.acceleration = { ...this.lastAcceleration };
+                    this.pendingImpact.severe = dynamicG >= this.options.crashGThreshold * this.options.crashSevereGMultiplier;
+                }
+                this.evaluatePendingImpact(sampledAt);
+                return;
+            }
+            if (dynamicG < this.options.crashGThreshold) return;
+            this.registerImpactCandidate(dynamicG, sampledAt);
+        };
+
+        recordMotionSample(dynamicG, sampledAt) {
+            this.recentMotion.push({ g: dynamicG, at: sampledAt });
+            const horizon = sampledAt - Math.max(this.options.crashImpactWindowMs * 2, 1000);
+            while (this.recentMotion.length && this.recentMotion[0].at < horizon) this.recentMotion.shift();
+            if (this.recentMotion.length > 400) this.recentMotion.splice(0, this.recentMotion.length - 400);
+        }
+
+        /* A GPS speed is only evidence of motion while the fix is recent. A
+         * stale fix may describe movement that stopped long ago, so it must not
+         * turn a jolt while parked, or a signal drop-out, into a false alarm. */
+        speedIsFresh(now = Date.now()) {
+            return Boolean(this.lastPosition) && now - (Number(this.lastPosition.at) || 0) <= this.options.crashSpeedFreshnessMs;
+        }
+
+        /* Stage one: a sustained impact while the bike was moving. Handlebar
+         * vibration, potholes and kerbs routinely produce single-sample spikes
+         * well above the threshold, so several consecutive high readings are
+         * required before an impact is even considered. Nothing is shown to the
+         * rider at this stage. */
+        registerImpactCandidate(dynamicG, sampledAt) {
+            if (this.crashPhase !== 'idle' || this.state !== 'riding' || this.pendingImpact) return false;
+            if (sampledAt < this.crashSuppressedUntil) return false;
+            if (!this.speedIsFresh(sampledAt) || this.currentSpeed < this.options.crashMinSpeedMph) return false;
+            const sustainedFloor = this.options.crashGThreshold * this.options.crashImpactSustainRatio;
+            const sustained = this.recentMotion.filter(sample => sampledAt - sample.at <= this.options.crashImpactWindowMs && sample.g >= sustainedFloor).length;
+            if (sustained < this.options.crashImpactMinSamples) return false;
             const recentTelemetry = this.compactTrace(this.session?.points || [], 18);
-            const impactAt = Date.now();
             this.pendingImpact = {
-                gForce,
+                gForce: dynamicG,
+                impactSamples: sustained,
+                severe: dynamicG >= this.options.crashGThreshold * this.options.crashSevereGMultiplier,
                 speedMph: this.currentSpeed,
+                impactSpeedMph: this.currentSpeed,
                 previousSpeedMph: this.previousSpeed,
-                moving: this.currentSpeed >= 3,
-                movingAtImpact: this.currentSpeed >= 3,
-                movementState: this.currentSpeed >= 3 ? 'moving' : 'stationary',
+                moving: true,
+                movingAtImpact: true,
+                movementState: 'moving',
                 acceleration: { ...this.lastAcceleration },
                 location: this.lastPosition ? { ...this.lastPosition, recordedAt: this.lastPosition.at } : null,
                 orientation: this.orientationSnapshot ? { ...this.orientationSnapshot, leanDegrees: rounded(this.lean, 1) } : { leanDegrees: rounded(this.lean, 1) },
@@ -409,11 +474,85 @@
                 recentTrace: recentTelemetry.map(point => ({ lat: point.lat, lng: point.lng, at: point.at })),
                 recentTelemetry,
                 plannedRoute: this.plannedRouteSummary(),
-                occurred_at: new Date(impactAt).toISOString(),
-                at: impactAt,
+                occurred_at: new Date(sampledAt).toISOString(),
+                at: sampledAt,
+                expiresAt: sampledAt + this.options.crashConfirmWindowMs,
+                gpsFixesAfter: 0,
+                stoppedFixes: 0,
+                firstStoppedAt: null,
+                stoppedAt: null,
+                tipOverSince: null,
             };
-            if (gForce >= this.options.crashGThreshold * 1.8) this.raiseCrashCandidate(this.pendingImpact);
-        };
+            return true;
+        }
+
+        /* Stage two: confirm or discard the impact from what the bike did next.
+         * A crash is declared only when the bike stops abruptly (a braking stop
+         * from the impact speed is far gentler), when the phone stays tipped
+         * over, or when a severe impact is followed by a stop or by total GPS
+         * loss. A rider who keeps riding, or who simply brakes to a halt after
+         * a bump, never sees a countdown. */
+        evaluatePendingImpact(now = Date.now(), context = {}) {
+            const impact = this.pendingImpact;
+            if (!impact) return false;
+            if (this.crashPhase !== 'idle' || this.state !== 'riding') {
+                this.pendingImpact = null;
+                return false;
+            }
+            const elapsedMs = now - impact.at;
+            if (Math.abs(this.lean) >= this.options.crashTipOverDegrees) {
+                if (!impact.tipOverSince) impact.tipOverSince = now;
+            } else {
+                impact.tipOverSince = null;
+            }
+            const tippedOver = Boolean(impact.tipOverSince) && now - impact.tipOverSince >= this.options.crashTipOverHoldMs;
+            const stopped = this.currentSpeed <= this.options.crashStopSpeedMph;
+
+            if (context.gpsFix) {
+                impact.gpsFixesAfter += 1;
+                const fixAt = Number(context.fixAt) || now;
+                if (stopped) {
+                    impact.stoppedFixes += 1;
+                    if (!impact.firstStoppedAt) impact.firstStoppedAt = fixAt;
+                    if (!impact.stoppedAt) impact.stoppedAt = now;
+                    if (impact.stoppedFixes >= this.options.crashStopConfirmFixes) {
+                        const stopSeconds = Math.max(0.5, (impact.firstStoppedAt - impact.at) / 1000);
+                        const deceleration = (impact.impactSpeedMph - this.currentSpeed) / stopSeconds;
+                        const abrupt = deceleration >= this.options.crashAbruptDecelerationMphPerSecond;
+                        if (abrupt || impact.severe || tippedOver) {
+                            return this.raiseCrashCandidate({
+                                ...impact,
+                                confirmation: abrupt ? 'abrupt_stop' : (impact.severe ? 'severe_impact' : 'tipped_over'),
+                                stoppedAfterSeconds: rounded(stopSeconds, 1),
+                            });
+                        }
+                    }
+                } else {
+                    impact.stoppedFixes = 0;
+                    impact.firstStoppedAt = null;
+                    if (elapsedMs >= this.options.crashResumeGraceMs && this.currentSpeed >= this.options.crashResumeSpeedMph) {
+                        return this.discardPendingImpact('rider_kept_moving');
+                    }
+                }
+            } else if (tippedOver && (stopped || !this.speedIsFresh(now))) {
+                return this.raiseCrashCandidate({ ...impact, confirmation: 'tipped_over' });
+            }
+
+            if (now >= impact.expiresAt) {
+                if (impact.severe && impact.gpsFixesAfter === 0) {
+                    return this.raiseCrashCandidate({ ...impact, confirmation: 'severe_impact_gps_lost' });
+                }
+                return this.discardPendingImpact(impact.stoppedAt ? 'gradual_stop' : 'no_confirmation');
+            }
+            return false;
+        }
+
+        discardPendingImpact(reason = 'no_confirmation') {
+            const impact = this.pendingImpact;
+            this.pendingImpact = null;
+            if (impact) this.emit('impactdiscarded', { reason, gForce: rounded(impact.gForce, 3), impactSamples: impact.impactSamples, at: impact.at });
+            return false;
+        }
 
         handleOrientation = event => {
             if (this.state !== 'riding') return;
@@ -524,11 +663,7 @@
             this.emit('gps', { state: 'ready', accuracy: next.accuracy });
             this.publishGuidance(next);
 
-            if (this.pendingImpact && Date.now() - this.pendingImpact.at < 5000 && this.currentSpeed < 5) {
-                this.raiseCrashCandidate(this.pendingImpact);
-            } else if (this.pendingImpact && Date.now() - this.pendingImpact.at >= 5000) {
-                this.pendingImpact = null;
-            }
+            this.evaluatePendingImpact(Date.now(), { gpsFix: true, fixAt: next.at });
         }
 
         prepareGuidance(route) {
@@ -656,6 +791,7 @@
 
         publishTelemetry() {
             if (this.state !== 'riding' || !this.session) return;
+            if (this.pendingImpact) this.evaluatePendingImpact(Date.now());
             const started = new Date(this.session.startedAt).getTime();
             this.emit('telemetry', {
                 rideId: this.session.id,
@@ -793,7 +929,11 @@
                 moving: impact.moving ?? this.currentSpeed >= 3,
                 movingAtImpact: (Number(impact.speedMph ?? this.currentSpeed) || 0) >= 3,
                 movementState: impact.movementState || (this.currentSpeed >= 3 ? 'moving' : 'stationary'),
-                peakG: rounded(impact.gForce ?? acceleration?.resultantG, 3),
+                peakG: rounded(impact.gForce ?? acceleration?.dynamicG ?? acceleration?.resultantG, 3),
+                impactSpeedMph: rounded(impact.impactSpeedMph ?? impact.speedMph ?? this.currentSpeed, 1),
+                impactSamples: impact.impactSamples ?? null,
+                confirmation: impact.confirmation || null,
+                stoppedAfterSeconds: impact.stoppedAfterSeconds ?? null,
                 acceleration: acceleration ? { ...acceleration } : null,
                 orientation,
                 leanDegrees: rounded(impact.leanDegrees ?? orientation.leanDegrees ?? this.lean, 1),
@@ -816,7 +956,12 @@
 
         raiseCrashCandidate(impact) {
             if (this.crashPhase !== 'idle' || this.state !== 'riding') return false;
+            if (Date.now() < this.crashSuppressedUntil) {
+                this.pendingImpact = null;
+                return false;
+            }
             this.pendingImpact = null;
+            this.recentMotion = [];
             this.crashEventId = impact?.event_id || impact?.id || makeId();
             this.crashDeadline = Date.now() + (this.options.crashCountdownSeconds * 1000);
             this.crashSeconds = this.options.crashCountdownSeconds;
@@ -846,6 +991,9 @@
             window.clearInterval(this.crashTimer);
             this.crashTimer = null;
             this.crashSeconds = 0;
+            // A rider who has just said they are fine should not be asked again
+            // moments later by the same bumpy stretch of road.
+            if (reason !== 'send') this.crashSuppressedUntil = Date.now() + this.options.crashRiderCancelCooldownMs;
             this.crashPhase = reason === 'send' ? 'sending' : 'cancelled';
             if (reason !== 'send') {
                 const eventId = this.crashEventId;

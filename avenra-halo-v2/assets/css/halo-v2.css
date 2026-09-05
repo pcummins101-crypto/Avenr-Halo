@@ -1,0 +1,2382 @@
+/*
+ * Avenrà Halo v2
+ * Premium, mobile-first application shell. No external runtime dependencies.
+ */
+
+:root {
+	--halo-ink: #101214;
+	--halo-ink-soft: #51575c;
+	--halo-ink-faint: #686e73;
+	--halo-paper: #f1f1ee;
+	--halo-surface: #ffffff;
+	--halo-surface-raised: #fafaf8;
+	--halo-line: rgba(15, 18, 20, 0.09);
+	--halo-line-strong: rgba(15, 18, 20, 0.17);
+	--halo-graphite: #101214;
+	--halo-graphite-soft: #1c2023;
+	--halo-blue: #176df1;
+	--halo-blue-dark: #0b55ca;
+	--halo-blue-pale: #e9f1ff;
+	--halo-green: #15805d;
+	--halo-amber: #a66308;
+	--halo-red: #cf2e2e;
+	--halo-radius-xs: 8px;
+	--halo-radius-sm: 12px;
+	--halo-radius: 16px;
+	--halo-radius-lg: 28px;
+	--halo-shadow-sm: 0 1px 1px rgba(8, 11, 13, 0.03), 0 10px 30px rgba(8, 11, 13, 0.04);
+	--halo-shadow-lg: 0 32px 90px rgba(5, 8, 10, 0.24);
+	--halo-safe-top: env(safe-area-inset-top, 0px);
+	--halo-safe-right: env(safe-area-inset-right, 0px);
+	--halo-safe-bottom: env(safe-area-inset-bottom, 0px);
+	--halo-safe-left: env(safe-area-inset-left, 0px);
+	--halo-nav-height: 74px;
+	--halo-header-height: 68px;
+	--halo-ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* The plugin-owned app page deliberately retains wp_head/wp_footer so Halo's
+ * scripts load normally. Suppress only the known global footer/menu widgets
+ * injected as body siblings; Halo's own navigation and dialogs live in root. */
+body.avenra-halo-v2-page > #tab-bar,
+body.avenra-halo-v2-page > #menu-discover,
+body.avenra-halo-v2-page > #menu-connect,
+body.avenra-halo-v2-page > #menu-join,
+body.avenra-halo-v2-page > #lq-overlay,
+body.avenra-halo-v2-page > #ampera-chat-interface {
+	display: none !important;
+	visibility: hidden !important;
+	pointer-events: none !important;
+}
+
+html:has(#avenra-halo-v2) {
+	background: var(--halo-paper);
+	overscroll-behavior-y: none;
+}
+
+body:has(#avenra-halo-v2) {
+	margin: 0;
+	background: var(--halo-paper);
+}
+
+/* The page template adds this class; keep the reset working in WebViews that
+ * do not yet support :has(). */
+body.avenra-halo-v2-page {
+	margin: 0;
+	background: var(--halo-paper);
+	overscroll-behavior-y: none;
+}
+
+.halo-app,
+.halo-app *,
+.halo-app *::before,
+.halo-app *::after {
+	box-sizing: border-box;
+}
+
+.halo-app {
+	position: relative;
+	isolation: isolate;
+	min-height: 100vh;
+	min-height: 100svh;
+	margin: 0;
+	color: var(--halo-ink);
+	background: var(--halo-paper);
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+	font-size: 16px;
+	font-weight: 400;
+	line-height: 1.45;
+	-webkit-font-smoothing: antialiased;
+	-webkit-tap-highlight-color: transparent;
+	text-rendering: optimizeLegibility;
+}
+
+.halo-app button,
+.halo-app input,
+.halo-app select,
+.halo-app textarea {
+	font: inherit;
+}
+
+.halo-app button,
+.halo-app [role="button"] {
+	touch-action: manipulation;
+}
+
+.halo-app button {
+	color: inherit;
+}
+
+.halo-app img {
+	display: block;
+	max-width: 100%;
+}
+
+.halo-app h1,
+.halo-app h2,
+.halo-app h3,
+.halo-app p {
+	margin-top: 0;
+}
+
+.halo-app h1,
+.halo-app h2,
+.halo-app h3,
+.halo-app strong {
+	letter-spacing: -0.025em;
+}
+
+.halo-app h1 {
+	margin-bottom: 8px;
+	font-size: clamp(28px, 7vw, 38px);
+	font-weight: 620;
+	line-height: 1.08;
+}
+
+.halo-app h2 {
+	margin-bottom: 10px;
+	font-size: 22px;
+	font-weight: 620;
+	line-height: 1.15;
+}
+
+.halo-app h3 {
+	margin-bottom: 6px;
+	font-size: 17px;
+	font-weight: 620;
+	line-height: 1.25;
+}
+
+.halo-app :focus-visible {
+	outline: 3px solid var(--halo-blue-dark);
+	outline-offset: 3px;
+	box-shadow: 0 0 0 5px #fff;
+}
+
+.halo-icon-library {
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+}
+
+.halo-icon {
+	width: 22px;
+	height: 22px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 1.75;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.halo-sr-only {
+	position: absolute !important;
+	width: 1px !important;
+	height: 1px !important;
+	padding: 0 !important;
+	margin: -1px !important;
+	overflow: hidden !important;
+	clip: rect(0, 0, 0, 0) !important;
+	white-space: nowrap !important;
+	border: 0 !important;
+}
+
+.halo-skip-link {
+	position: fixed;
+	top: calc(var(--halo-safe-top) + 8px);
+	left: 12px;
+	z-index: 1200;
+	padding: 10px 14px;
+	border-radius: var(--halo-radius-xs);
+	color: #fff;
+	background: var(--halo-graphite);
+	transform: translateY(-150%);
+	transition: transform 160ms ease;
+}
+
+.halo-skip-link:focus-visible {
+	transform: translateY(0);
+}
+
+[hidden] {
+	display: none !important;
+}
+
+/* Boot */
+.halo-boot {
+	position: fixed;
+	inset: 0;
+	z-index: 900;
+	display: grid;
+	place-content: center;
+	justify-items: center;
+	gap: 26px;
+	padding: 32px;
+	color: #fff;
+	background:
+		radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.065), transparent 29%),
+		linear-gradient(145deg, #191c1f, #080a0c 72%);
+}
+
+.halo-boot p {
+	margin: 0;
+	color: rgba(255, 255, 255, 0.58);
+	font-size: 13px;
+	letter-spacing: 0.04em;
+}
+
+.halo-boot-mark {
+	width: 38px;
+	height: 38px;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-top-color: #fff;
+	box-shadow: inset 0 0 0 7px rgba(255, 255, 255, 0.025), 0 0 26px rgba(255, 255, 255, 0.07);
+	border-radius: 50%;
+	animation: halo-spin 900ms linear infinite;
+}
+
+@keyframes halo-spin { to { transform: rotate(360deg); } }
+
+.halo-brand-logo {
+	display: block;
+	flex: 0 0 auto;
+	height: auto;
+	max-width: 100%;
+	object-fit: contain;
+	object-position: left center;
+}
+
+.halo-brand-logo--light {
+	padding: 10px 14px;
+	border: 1px solid rgba(255, 255, 255, 0.44);
+	border-radius: 17px;
+	background: #f7f7f3;
+	box-shadow: 0 16px 42px rgba(0, 0, 0, 0.22), inset 0 1px 0 #fff;
+}
+.halo-brand-logo--boot { width: 210px; object-position: center; }
+.halo-brand-logo--auth { width: 162px; margin-bottom: 31px; }
+.halo-brand-logo--topbar { width: 94px; }
+.halo-brand-logo--public { width: 124px; }
+.halo-brand-fallback { color: currentColor; font-size: 18px; font-weight: 740; letter-spacing: 0.08em; }
+
+.halo-brand-lockup {
+	display: flex;
+	align-items: center;
+	min-width: 0;
+}
+
+/* Connectivity */
+.halo-system-banner {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	gap: 9px;
+	min-height: calc(48px + var(--halo-safe-top));
+	padding: calc(8px + var(--halo-safe-top)) max(14px, var(--halo-safe-right)) 8px max(14px, var(--halo-safe-left));
+	color: #fff;
+	background: #6e4a11;
+	box-shadow: 0 5px 22px rgba(0, 0, 0, 0.16);
+	font-size: 13px;
+}
+
+.halo-system-banner > span {
+	flex: 1;
+}
+
+.halo-system-banner .halo-text-button {
+	color: #fff;
+	text-decoration: underline;
+	text-underline-offset: 3px;
+}
+
+.halo-system-banner .halo-icon {
+	width: 18px;
+	height: 18px;
+	flex: 0 0 auto;
+}
+
+/* Auth */
+.halo-auth {
+	display: grid;
+	align-items: start;
+	min-height: 100vh;
+	min-height: 100svh;
+	padding: calc(22px + var(--halo-safe-top)) max(14px, var(--halo-safe-right)) calc(22px + var(--halo-safe-bottom)) max(14px, var(--halo-safe-left));
+	background:
+		radial-gradient(circle at 85% 3%, rgba(255, 255, 255, 0.075), transparent 28%),
+		linear-gradient(150deg, #1a1d20 0%, #090b0d 76%);
+}
+
+.halo-auth-panel {
+	width: min(100%, 460px);
+	margin: 0 auto;
+	padding: 26px 22px 24px;
+	border: 1px solid rgba(255, 255, 255, 0.38);
+	border-radius: 30px;
+	background: var(--halo-paper);
+	box-shadow: 0 28px 90px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+
+.halo-auth-header {
+	margin: 0 0 28px;
+}
+
+.halo-auth-header h1 {
+	margin-bottom: 9px;
+}
+
+.halo-auth-header > p:last-child,
+.halo-auth-form > p {
+	color: var(--halo-ink-soft);
+}
+
+.halo-eyebrow {
+	margin-bottom: 7px;
+	color: var(--halo-blue-dark);
+	font-size: 11px;
+	font-weight: 690;
+	letter-spacing: 0.13em;
+}
+
+.halo-segmented {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 4px;
+	margin-bottom: 24px;
+	padding: 4px;
+	border: 1px solid var(--halo-line);
+	border-radius: 14px;
+	background: rgba(16, 18, 20, 0.045);
+}
+
+.halo-segmented button {
+	min-height: 42px;
+	padding: 8px 12px;
+	border: 0;
+	border-radius: 10px;
+	color: var(--halo-ink-soft);
+	background: transparent;
+	font-size: 14px;
+	font-weight: 610;
+	cursor: pointer;
+}
+
+.halo-segmented button.is-active {
+	color: var(--halo-ink);
+	background: #fff;
+	box-shadow: 0 1px 6px rgba(8, 11, 13, 0.09);
+}
+
+.halo-auth-form {
+	display: grid;
+	gap: 16px;
+}
+
+.halo-auth-form h2 {
+	margin: 4px 0 0;
+}
+
+.halo-verification-step {
+	display: grid;
+	gap: 14px;
+	padding: 16px;
+	border: 1px solid rgba(23, 109, 241, 0.2);
+	border-radius: 16px;
+	background: rgba(23, 109, 241, 0.06);
+}
+
+.halo-verification-step > p {
+	margin: 0;
+	color: var(--halo-ink-soft);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.halo-verification-step > p strong {
+	color: var(--halo-ink);
+}
+
+.halo-field-row {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 16px;
+}
+
+.halo-field {
+	display: grid;
+	gap: 7px;
+	color: var(--halo-ink);
+	font-size: 14px;
+	font-weight: 560;
+}
+
+.halo-field small,
+.halo-check,
+.halo-helper {
+	color: var(--halo-ink-soft);
+	font-size: 12px;
+	font-weight: 400;
+}
+
+.halo-field input,
+.halo-field select,
+.halo-field textarea,
+.halo-search-field input,
+.halo-location-field input {
+	width: 100%;
+	min-height: 50px;
+	padding: 12px 14px;
+	border: 1px solid var(--halo-line-strong);
+	border-radius: 14px;
+	color: var(--halo-ink);
+	background: rgba(255, 255, 255, 0.92);
+	font-size: 16px;
+	outline: none;
+	transition: border-color 160ms ease, box-shadow 160ms ease;
+	-webkit-appearance: none;
+}
+
+.halo-field textarea {
+	min-height: 96px;
+	resize: vertical;
+}
+
+.halo-field input:focus,
+.halo-field select:focus,
+.halo-field textarea:focus,
+.halo-search-field input:focus,
+.halo-location-field input:focus {
+	border-color: var(--halo-blue);
+	box-shadow: 0 0 0 3px rgba(23, 109, 241, 0.12);
+}
+
+.halo-field input[aria-invalid="true"] {
+	border-color: var(--halo-red);
+}
+
+.halo-check {
+	display: grid;
+	grid-template-columns: 22px 1fr;
+	gap: 10px;
+	align-items: start;
+	line-height: 1.45;
+	cursor: pointer;
+}
+
+.halo-check input {
+	width: 20px;
+	height: 20px;
+	margin: 0;
+	accent-color: var(--halo-blue);
+}
+
+.halo-button {
+	--halo-spinner: var(--halo-graphite);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 9px;
+	min-height: 50px;
+	padding: 12px 18px;
+	border: 1px solid transparent;
+	border-radius: 14px;
+	font-size: 15px;
+	font-weight: 650;
+	line-height: 1.2;
+	text-decoration: none;
+	cursor: pointer;
+	transition: transform 120ms ease, background 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+
+.halo-button:active { transform: scale(0.985); }
+.halo-button:disabled { opacity: 0.48; cursor: not-allowed; }
+
+.halo-upload-zone.is-offline-disabled,
+.halo-file-button.is-offline-disabled {
+	opacity: 0.52;
+	cursor: not-allowed;
+	filter: grayscale(0.2);
+}
+
+.halo-button--primary {
+	--halo-spinner: #fff;
+	color: #fff !important;
+	background: var(--halo-graphite);
+	box-shadow: 0 9px 22px rgba(10, 13, 15, 0.14);
+}
+
+.halo-button--danger {
+	--halo-spinner: #fff;
+	color: #fff !important;
+	background: #a71f25;
+	box-shadow: 0 9px 22px rgba(121, 19, 25, 0.16);
+}
+
+.halo-button--secondary {
+	--halo-spinner: var(--halo-graphite);
+	color: var(--halo-ink);
+	border-color: var(--halo-line-strong);
+	background: var(--halo-surface);
+}
+
+.halo-button--quiet {
+	color: var(--halo-ink);
+	border-color: transparent;
+	background: transparent;
+}
+
+.halo-button--light {
+	--halo-spinner: var(--halo-graphite);
+	color: var(--halo-graphite);
+	background: #fff;
+}
+
+.halo-button.is-loading {
+	position: relative;
+	color: transparent !important;
+	pointer-events: none;
+}
+
+.halo-button.is-loading::after {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	border: 2px solid currentColor;
+	border-top-color: transparent;
+	border-radius: 50%;
+	color: var(--halo-spinner);
+	content: "";
+	animation: halo-spin 700ms linear infinite;
+}
+
+.halo-text-button,
+.halo-back-button {
+	min-height: 44px;
+	padding: 8px 4px;
+	border: 0;
+	color: var(--halo-blue-dark);
+	background: transparent;
+	font-size: 13px;
+	font-weight: 620;
+	cursor: pointer;
+}
+
+.halo-text-button--light { color: #fff; }
+.halo-centered { justify-self: center; }
+
+.halo-back-button {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	margin-left: -4px;
+}
+
+.halo-back-button .halo-icon { width: 18px; height: 18px; }
+
+.halo-card > .halo-field + .halo-field,
+.halo-card > .halo-field-row + .halo-field,
+.halo-card > .halo-field + .halo-field-row,
+.halo-card > .halo-field-row + .halo-field-row {
+	margin-top: 16px;
+}
+
+@media (hover: hover) {
+	.halo-button--primary:hover { background: #25292d; }
+	.halo-button--danger:hover { background: #8f171d; }
+}
+
+.halo-inline-alert {
+	margin-bottom: 16px;
+	padding: 12px 14px;
+	border: 1px solid rgba(207, 46, 46, 0.18);
+	border-radius: var(--halo-radius-sm);
+	color: #8d1c1c;
+	background: #fff1f0;
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.halo-inline-alert.is-success {
+	border-color: rgba(21, 128, 93, 0.2);
+	color: #0e6648;
+	background: #eef9f4;
+}
+
+/* Product shell */
+.halo-product {
+	min-height: 100vh;
+	min-height: 100svh;
+	background: var(--halo-paper);
+}
+
+.halo-topbar {
+	position: fixed;
+	top: 0;
+	left: 0;
+	right: 0;
+	z-index: 80;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	height: calc(var(--halo-header-height) + var(--halo-safe-top));
+	padding: var(--halo-safe-top) max(18px, var(--halo-safe-right)) 0 max(18px, var(--halo-safe-left));
+	border-bottom: 1px solid rgba(15, 18, 20, 0.075);
+	background: rgba(241, 241, 238, 0.86);
+	backdrop-filter: blur(28px) saturate(1.25);
+	-webkit-backdrop-filter: blur(28px) saturate(1.25);
+}
+
+.halo-product-name {
+	font-size: 11px;
+	font-weight: 650;
+	letter-spacing: 0.11em;
+	text-transform: uppercase;
+}
+
+.halo-topbar-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.halo-status-pill {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	min-height: 44px;
+	padding: 8px 12px;
+	border: 1px solid var(--halo-line);
+	border-radius: 999px;
+	color: var(--halo-ink-soft);
+	background: rgba(255, 255, 255, 0.72);
+	font-size: 11px;
+	font-weight: 620;
+	cursor: pointer;
+}
+
+.halo-status-dot {
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--halo-ink-faint);
+}
+
+.halo-status-pill.is-connected .halo-status-dot { background: var(--halo-green); box-shadow: 0 0 0 4px rgba(21, 128, 93, 0.1); }
+.halo-status-pill.is-attention .halo-status-dot { background: var(--halo-amber); }
+.halo-status-pill.is-connecting .halo-status-dot { background: var(--halo-blue); box-shadow: 0 0 0 4px rgba(23, 109, 241, 0.1); animation: halo-bms-pulse 1.4s ease-in-out infinite; }
+
+@keyframes halo-bms-pulse {
+	50% { opacity: .4; transform: scale(.82); }
+}
+
+.halo-status-pill.is-connected {
+	justify-content: center;
+	width: 44px;
+	padding-inline: 0;
+}
+
+.halo-status-pill.is-connected > span:last-child { display: none; }
+
+.halo-avatar,
+.halo-icon-button,
+.halo-cart-button {
+	display: inline-grid;
+	place-items: center;
+	width: 44px;
+	height: 44px;
+	padding: 0;
+	border: 1px solid var(--halo-line);
+	border-radius: 50%;
+	color: #fff;
+	background: var(--halo-graphite);
+	font-size: 12px;
+	font-weight: 700;
+	cursor: pointer;
+}
+
+/* The general `.halo-app button { color: inherit; }` reset has greater
+ * selector specificity than a single component class. Scope the foreground
+ * override to the app as well so dark circular controls never render their
+ * icon or label black-on-black in embedded Android WebViews. */
+.halo-app .halo-avatar,
+.halo-app .halo-icon-button,
+.halo-app .halo-cart-button {
+	color: #fff;
+}
+
+.halo-avatar {
+	overflow: hidden;
+}
+
+.halo-avatar-logo {
+	display: block;
+	width: 100%;
+	height: 100%;
+	border-radius: 50%;
+	object-fit: cover;
+	object-position: center;
+	pointer-events: none;
+}
+
+.halo-close-glyph {
+	display: block;
+	color: #fff;
+	font-family: Arial, Helvetica, sans-serif;
+	font-size: 27px;
+	font-weight: 300;
+	line-height: 1;
+	transform: translateY(-1px);
+}
+
+.halo-main {
+	min-height: 100vh;
+	min-height: 100svh;
+	padding-top: calc(var(--halo-header-height) + var(--halo-safe-top));
+	padding-bottom: calc(var(--halo-nav-height) + var(--halo-safe-bottom) + 34px);
+}
+
+.halo-view {
+	width: min(100%, 760px);
+	min-height: calc(100svh - var(--halo-header-height) - var(--halo-nav-height) - var(--halo-safe-top) - var(--halo-safe-bottom));
+	margin: 0 auto;
+	padding: 24px max(18px, var(--halo-safe-right)) 30px max(18px, var(--halo-safe-left));
+	animation: halo-enter 260ms var(--halo-ease) both;
+}
+
+@keyframes halo-enter {
+	from { opacity: 0; transform: translateY(8px); }
+	to { opacity: 1; transform: translateY(0); }
+}
+
+.halo-view-content {
+	display: grid;
+	gap: 16px;
+}
+
+.halo-page-header {
+	margin: 5px 0 24px;
+}
+
+.halo-page-header--compact,
+.halo-detail-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.halo-page-header--compact { margin-bottom: 15px; }
+.halo-page-header--compact h1 { margin: 0; font-size: 27px; }
+
+.halo-detail-header {
+	min-height: 54px;
+	margin-bottom: 20px;
+}
+
+.halo-detail-header h1 {
+	flex: 1;
+	margin: 0;
+	font-size: 24px;
+	text-align: center;
+}
+
+.halo-detail-header > :last-child:not(h1) { flex: 0 0 auto; }
+.halo-detail-header > .halo-back-button { flex: 0 0 auto; }
+
+/* Bottom navigation */
+.halo-bottom-nav {
+	position: fixed;
+	left: max(10px, var(--halo-safe-left));
+	right: max(10px, var(--halo-safe-right));
+	bottom: max(10px, var(--halo-safe-bottom));
+	z-index: 90;
+	display: grid;
+	grid-template-columns: repeat(5, minmax(0, 1fr));
+	height: var(--halo-nav-height);
+	padding: 7px 6px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 23px;
+	background: rgba(15, 18, 20, 0.94);
+	box-shadow: 0 18px 55px rgba(5, 8, 10, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+	backdrop-filter: blur(26px) saturate(1.18);
+	-webkit-backdrop-filter: blur(26px) saturate(1.18);
+}
+
+.halo-bottom-nav > button {
+	position: relative;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 3px;
+	min-width: 0;
+	min-height: 56px;
+	padding: 4px 2px;
+	border: 0;
+	color: rgba(255, 255, 255, 0.52);
+	background: transparent;
+	font-size: 10px;
+	font-weight: 610;
+	cursor: pointer;
+}
+
+.halo-bottom-nav > button .halo-icon { width: 22px; height: 22px; }
+.halo-bottom-nav > button.is-active { color: #fff; }
+
+.halo-bottom-nav > button.is-active::after {
+	position: absolute;
+	bottom: 2px;
+	width: 4px;
+	height: 4px;
+	border-radius: 50%;
+	background: var(--halo-blue);
+	content: "";
+}
+
+.halo-bottom-nav .halo-ride-nav {
+	justify-content: flex-start;
+	padding-top: 0;
+}
+
+.halo-ride-nav-icon {
+	display: grid;
+	place-items: center;
+	width: 50px;
+	height: 50px;
+	margin-top: -21px;
+	border: 5px solid var(--halo-graphite);
+	border-radius: 50%;
+	color: var(--halo-graphite);
+	background: #fff;
+	box-shadow: 0 9px 22px rgba(0, 0, 0, 0.32);
+}
+
+.halo-ride-nav.is-active .halo-ride-nav-icon { box-shadow: 0 9px 24px rgba(0, 0, 0, 0.36), 0 0 0 2px var(--halo-blue); }
+
+.halo-ride-nav-icon .halo-icon { width: 23px !important; height: 23px !important; }
+
+/* Generic content */
+.halo-card {
+	padding: 18px;
+	border: 1px solid var(--halo-line);
+	border-radius: var(--halo-radius);
+	background: var(--halo-surface);
+	box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), 0 8px 25px rgba(8, 11, 13, 0.025);
+}
+
+.halo-card--flat { box-shadow: none; }
+.halo-card--tint { background: var(--halo-blue-pale); border-color: rgba(23, 109, 241, 0.1); }
+.halo-card--dark { color: #fff; background: var(--halo-graphite); border-color: transparent; }
+
+.halo-card-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+	margin-bottom: 15px;
+}
+
+.halo-card-header h2,
+.halo-card-header h3,
+.halo-card-header p { margin-bottom: 0; }
+
+.halo-card-kicker {
+	margin-bottom: 4px;
+	color: var(--halo-ink-faint);
+	font-size: 11px;
+	font-weight: 650;
+	letter-spacing: 0.09em;
+	text-transform: uppercase;
+}
+
+.halo-card--dark .halo-card-kicker { color: rgba(255, 255, 255, 0.55); }
+
+.halo-card-copy {
+	margin-bottom: 0;
+	color: var(--halo-ink-soft);
+	font-size: 14px;
+}
+
+.halo-card--dark .halo-card-copy { color: rgba(255, 255, 255, 0.65); }
+
+.halo-hero {
+	--halo-vehicle-accent: #646b71;
+	--halo-colour-swatch: #646b71;
+	position: relative;
+	overflow: hidden;
+	min-height: 342px;
+	padding: 24px;
+	border: 1px solid rgba(255, 255, 255, 0.09);
+	border-radius: var(--halo-radius-lg);
+	color: #fff;
+	background: linear-gradient(148deg, #262a2e 0%, #0b0d0f 74%);
+	background:
+		radial-gradient(ellipse at 54% 50%, color-mix(in srgb, var(--halo-vehicle-accent) 34%, transparent) 0%, transparent 45%),
+		linear-gradient(148deg, #262a2e 0%, #0b0d0f 74%);
+	box-shadow: 0 26px 70px rgba(8, 11, 13, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.halo-hero::before {
+	position: absolute;
+	inset: 0;
+	background: linear-gradient(118deg, rgba(255, 255, 255, 0.09), transparent 22%, transparent 74%, rgba(255, 255, 255, 0.025));
+	content: "";
+	pointer-events: none;
+}
+
+.halo-hero::after {
+	position: absolute;
+	inset: 16% -12% -22% 26%;
+	background-image:
+		linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+		linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+	background-size: 24px 24px;
+	content: "";
+	mask-image: radial-gradient(circle at 52% 48%, #000 0, transparent 66%);
+	-webkit-mask-image: radial-gradient(circle at 52% 48%, #000 0, transparent 66%);
+	pointer-events: none;
+}
+
+.halo-hero-heading {
+	position: relative;
+	z-index: 2;
+}
+
+.halo-hero-heading h1 { margin-bottom: 7px; font-size: clamp(28px, 7.2vw, 34px); }
+.halo-hero-heading > .halo-eyebrow { color: rgba(255, 255, 255, 0.64); }
+
+.halo-hero-subtitle {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	margin: 0;
+	color: rgba(255, 255, 255, 0.82);
+	font-size: 13px;
+	line-height: 1.45;
+}
+
+.halo-paint-swatch {
+	flex: 0 0 auto;
+	width: 11px;
+	height: 11px;
+	border: 1px solid rgba(255, 255, 255, 0.48);
+	border-radius: 50%;
+	background: var(--halo-colour-swatch);
+	box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.07);
+}
+
+.halo-bike-visual {
+	position: relative;
+	z-index: 1;
+	display: grid;
+	place-items: center;
+	overflow: hidden;
+	height: clamp(164px, 42vw, 190px);
+	margin: -1px -12px 3px;
+}
+
+.halo-bike-plinth {
+	position: absolute;
+	bottom: 13%;
+	left: 18%;
+	width: 64%;
+	height: 18%;
+	border-radius: 50%;
+	background: rgba(255, 255, 255, 0.08);
+	background: color-mix(in srgb, var(--halo-vehicle-accent) 34%, rgba(255, 255, 255, 0.08));
+	filter: blur(18px);
+	opacity: 0.66;
+}
+
+.halo-bike-visual img {
+	position: relative;
+	width: 100% !important;
+	max-width: none !important;
+	height: 100% !important;
+	max-height: 100% !important;
+	object-fit: contain !important;
+	filter: drop-shadow(0 22px 28px rgba(0, 0, 0, 0.46));
+	transform: scale(1.035);
+}
+
+.halo-hero--product-stage {
+	isolation: isolate;
+	min-height: 0;
+	padding: 24px 22px 20px;
+	border-radius: 32px;
+	background:
+		radial-gradient(ellipse 76% 42% at 50% 54%, color-mix(in srgb, var(--halo-vehicle-accent) 27%, rgba(255, 255, 255, 0.06)) 0%, transparent 68%),
+		linear-gradient(148deg, #262a2e 0%, #090b0d 76%);
+}
+
+.halo-hero--product-stage .halo-hero-heading h1 { text-wrap: balance; }
+
+.halo-hero--product-stage .halo-bike-visual {
+	isolation: isolate;
+	width: 100%;
+	height: clamp(170px, 49vw, 224px);
+	margin: 16px 0 18px;
+	border: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 24px;
+	background:
+		radial-gradient(ellipse at 50% 46%, rgba(255, 255, 255, 0.3) 0%, rgba(255, 255, 255, 0.12) 43%, transparent 73%),
+		linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.015));
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), inset 0 -24px 45px rgba(0, 0, 0, 0.14);
+}
+
+.halo-hero--product-stage .halo-bike-visual::after {
+	position: absolute;
+	z-index: 1;
+	right: 13%;
+	bottom: 9%;
+	left: 13%;
+	height: 18%;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.13);
+	border-radius: 50%;
+	box-shadow: 0 13px 30px color-mix(in srgb, var(--halo-vehicle-accent) 20%, rgba(0, 0, 0, 0.42));
+	content: "";
+	pointer-events: none;
+}
+
+.halo-hero--product-stage .halo-bike-plinth {
+	z-index: 1;
+	bottom: 13%;
+	left: 13%;
+	width: 74%;
+	height: 14%;
+	background: rgba(0, 0, 0, 0.44);
+	filter: blur(17px);
+	opacity: 0.8;
+}
+
+#avenra-halo-v2 .halo-hero--product-stage .halo-bike-visual > img {
+	position: relative !important;
+	z-index: 2;
+	display: block;
+	width: 100% !important;
+	max-width: 100% !important;
+	height: 100% !important;
+	max-height: 100% !important;
+	padding: 5px 4px 10px;
+	object-fit: contain !important;
+	object-position: 50% 50%;
+	filter: drop-shadow(0 20px 24px rgba(0, 0, 0, 0.48));
+	transform: scale(1.04);
+	pointer-events: none;
+	user-select: none;
+}
+
+.halo-hero--product-stage .halo-hero-footer { background: rgba(5, 7, 9, 0.82); }
+
+.halo-bike-silhouette {
+	width: 76%;
+	height: 72px;
+	border-radius: 60% 20% 48% 36%;
+	background: linear-gradient(140deg, #42484e, #202428);
+	filter: drop-shadow(0 18px 20px rgba(0, 0, 0, 0.46));
+	transform: skewX(-12deg);
+}
+
+.halo-hero-footer {
+	position: relative;
+	z-index: 3;
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 14px;
+	margin: 0;
+	padding: 14px;
+	border-top: 1px solid rgba(255, 255, 255, 0.1);
+	border-radius: 18px;
+	background: rgba(5, 7, 9, 0.62);
+	-webkit-backdrop-filter: blur(14px);
+	backdrop-filter: blur(14px);
+}
+
+.halo-hero-footer > div { min-width: 0; }
+.halo-hero-footer strong { display: block; font-size: 24px; font-weight: 580; }
+.halo-hero-footer small { color: rgba(255, 255, 255, 0.55); }
+
+.halo-app .halo-hero-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 168px;
+	min-height: 46px;
+	padding: 10px 16px;
+	border: 1px solid rgba(255, 255, 255, 0.92);
+	border-radius: 999px;
+	color: var(--halo-graphite) !important;
+	-webkit-text-fill-color: var(--halo-graphite) !important;
+	background: #fff !important;
+	box-shadow: 0 10px 25px rgba(0, 0, 0, 0.18);
+	font-size: 13px;
+	font-weight: 680;
+	line-height: 1.2;
+	opacity: 1 !important;
+	text-align: center;
+	text-shadow: none !important;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.halo-app .halo-hero-action:focus-visible {
+	outline: 3px solid rgba(255, 255, 255, 0.54);
+	outline-offset: 3px;
+}
+
+#avenra-halo-v2.halo-app button.halo-hero-action,
+#avenra-halo-v2.halo-app button.halo-hero-action:hover,
+#avenra-halo-v2.halo-app button.halo-hero-action:active,
+#avenra-halo-v2.halo-app button.halo-hero-action:focus {
+	min-height: 50px;
+	border-color: #fff !important;
+	color: var(--halo-graphite) !important;
+	-webkit-text-fill-color: var(--halo-graphite) !important;
+	background: #fff !important;
+	font-size: 14px;
+	font-weight: 700;
+	opacity: 1 !important;
+	text-shadow: none !important;
+}
+
+.halo-hero--compact {
+	min-height: 270px;
+}
+
+.halo-hero--compact .halo-bike-visual {
+	height: 126px;
+	margin-block: -2px 1px;
+}
+
+.halo-hero--compact .halo-hero-heading h1 { font-size: 27px; }
+
+.halo-metric-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.halo-metric {
+	min-height: 104px;
+	padding: 16px;
+	border: 1px solid var(--halo-line);
+	border-radius: var(--halo-radius);
+	background: linear-gradient(145deg, #fff, #fafaf8);
+	box-shadow: 0 8px 26px rgba(8, 11, 13, 0.025);
+}
+
+.halo-metric .halo-icon { margin-bottom: 13px; color: var(--halo-blue); }
+.halo-metric small { display: block; margin-bottom: 2px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-metric strong { display: block; font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 610; }
+.halo-metric span { color: var(--halo-ink-soft); font-size: 11px; }
+
+.halo-hypercore-overview,
+.halo-hypercore-component,
+.halo-bms-card { overflow: hidden; }
+.halo-hypercore-link-map { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; margin-top: 17px; }
+.halo-hypercore-link-map span { position: relative; min-width: 0; padding: 11px 12px 11px 30px; border: 1px solid var(--halo-line); border-radius: 13px; color: var(--halo-ink-soft); background: var(--halo-surface); font-size: 12px; font-weight: 650; }
+.halo-hypercore-link-map span::before { position: absolute; top: 50%; left: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--halo-ink-faint); content: ""; transform: translateY(-50%); }
+.halo-hypercore-link-map span.is-live { color: var(--halo-ink); border-color: rgba(21, 128, 93, .24); background: rgba(21, 128, 93, .055); }
+.halo-hypercore-link-map span.is-live::before { background: var(--halo-green); box-shadow: 0 0 0 4px rgba(21, 128, 93, .1); }
+.halo-hypercore-components { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 285px), 1fr)); gap: 14px; }
+.halo-hypercore-components > .halo-card { margin: 0; }
+.halo-hypercore-metrics,
+.halo-bms-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; overflow: hidden; margin-top: 17px; border: 1px solid var(--halo-line); border-radius: 15px; background: var(--halo-line); }
+.halo-hypercore-metrics > div,
+.halo-bms-metrics > div { min-width: 0; padding: 13px 14px; background: var(--halo-surface); }
+.halo-hypercore-metrics small,
+.halo-bms-metrics small { display: block; margin-bottom: 4px; color: var(--halo-ink-soft); font-size: 10px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+.halo-hypercore-metrics strong,
+.halo-bms-metrics strong { display: block; overflow: hidden; font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 620; text-overflow: ellipsis; white-space: nowrap; }
+.halo-hypercore-metrics > div.is-attention { background: rgba(179, 104, 0, .075); }
+.halo-hypercore-metrics > div.is-attention strong { color: #8a5100; }
+.halo-hypercore-actions,
+.halo-bms-actions { margin-top: 17px; }
+.halo-hypercore-safety,
+.halo-bms-safety { margin: 13px 0 0; }
+
+.halo-action-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+}
+
+.halo-action-card {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: space-between;
+	min-height: 128px;
+	padding: 16px;
+	border: 1px solid var(--halo-line);
+	border-radius: var(--halo-radius);
+	color: var(--halo-ink);
+	background: linear-gradient(145deg, #fff 0%, #fafaf8 100%);
+	text-align: left;
+	cursor: pointer;
+	box-shadow: 0 8px 26px rgba(8, 11, 13, 0.025);
+	transition: transform 150ms var(--halo-ease), border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.halo-action-card > .halo-icon { width: 38px; height: 38px; padding: 9px; border-radius: 12px; color: var(--halo-ink); background: rgba(16, 18, 20, 0.055); }
+.halo-action-card > span { margin-top: 17px; font-size: 14px; font-weight: 650; }
+.halo-action-card small { color: var(--halo-ink-faint); font-size: 11px; }
+
+.halo-action-card:active { transform: scale(0.975); }
+
+@media (hover: hover) {
+	.halo-action-card:hover { border-color: var(--halo-line-strong); box-shadow: 0 13px 34px rgba(8, 11, 13, 0.07); transform: translateY(-2px); }
+}
+
+.halo-section-heading {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+	margin: 8px 1px -3px;
+}
+
+.halo-section-heading h2 { margin: 0; font-size: 18px; }
+
+.halo-menu-list {
+	overflow: hidden;
+	border: 1px solid var(--halo-line);
+	border-radius: var(--halo-radius);
+	background: var(--halo-surface);
+}
+
+.halo-menu-item {
+	display: grid;
+	grid-template-columns: 44px minmax(0, 1fr) 20px;
+	align-items: center;
+	gap: 12px;
+	width: 100%;
+	min-height: 70px;
+	padding: 11px 14px;
+	border: 0;
+	border-bottom: 1px solid var(--halo-line);
+	color: var(--halo-ink);
+	background: transparent;
+	text-align: left;
+	cursor: pointer;
+}
+
+.halo-menu-item:last-child { border-bottom: 0; }
+.halo-menu-icon { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; color: var(--halo-blue); background: var(--halo-blue-pale); }
+.halo-menu-icon .halo-icon { width: 20px; height: 20px; }
+.halo-menu-copy strong { display: block; margin-bottom: 2px; font-size: 14px; font-weight: 620; }
+.halo-menu-copy small { display: block; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-menu-item > .halo-icon { width: 17px; height: 17px; color: var(--halo-ink-faint); }
+
+.halo-scroll-tabs {
+	display: flex;
+	gap: 7px;
+	overflow-x: auto;
+	margin: -9px -18px 18px;
+	padding: 9px 18px 4px;
+	scrollbar-width: none;
+}
+
+.halo-scroll-tabs::-webkit-scrollbar { display: none; }
+
+.halo-scroll-tabs button {
+	flex: 0 0 auto;
+	min-height: 39px;
+	padding: 8px 14px;
+	border: 1px solid var(--halo-line);
+	border-radius: 999px;
+	color: var(--halo-ink-soft);
+	background: var(--halo-surface);
+	font-size: 13px;
+	font-weight: 610;
+	cursor: pointer;
+}
+
+.halo-scroll-tabs button.is-active { color: #fff; border-color: var(--halo-graphite); background: var(--halo-graphite); }
+
+.halo-spec-list { margin: 0; }
+.halo-spec-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; padding: 13px 0; border-bottom: 1px solid var(--halo-line); }
+.halo-spec-row:last-child { border-bottom: 0; }
+.halo-spec-row dt { color: var(--halo-ink-soft); font-size: 13px; }
+.halo-spec-row dd { margin: 0; font-size: 13px; font-weight: 610; text-align: right; }
+
+.halo-progress-track { position: relative; display: grid; gap: 0; padding-left: 4px; }
+.halo-progress-step { position: relative; display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 12px; min-height: 74px; }
+.halo-progress-step::before { position: absolute; top: 27px; bottom: -4px; left: 14px; width: 1px; background: var(--halo-line-strong); content: ""; }
+.halo-progress-step:last-child::before { display: none; }
+.halo-progress-dot { position: relative; z-index: 1; display: grid; place-items: center; width: 29px; height: 29px; border: 1px solid var(--halo-line-strong); border-radius: 50%; color: var(--halo-ink-faint); background: var(--halo-surface); font-size: 11px; font-weight: 700; }
+.halo-progress-step.is-complete .halo-progress-dot { color: #fff; border-color: var(--halo-green); background: var(--halo-green); }
+.halo-progress-step.is-current .halo-progress-dot { color: #fff; border-color: var(--halo-blue); background: var(--halo-blue); box-shadow: 0 0 0 5px var(--halo-blue-pale); }
+.halo-progress-copy { padding-top: 3px; }
+.halo-progress-copy strong { display: block; font-size: 14px; }
+.halo-progress-copy small { color: var(--halo-ink-faint); font-size: 11px; }
+
+.halo-badge { display: inline-flex; align-items: center; gap: 5px; min-height: 26px; padding: 4px 9px; border-radius: 999px; color: var(--halo-ink-soft); background: #eef0f1; font-size: 10px; font-weight: 680; letter-spacing: 0.02em; }
+.halo-badge--good { color: #0c6848; background: #eaf8f2; }
+.halo-badge--attention { color: #83510a; background: #fff4dc; }
+
+.halo-toggle-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; min-height: 65px; padding: 10px 0; border-bottom: 1px solid var(--halo-line); }
+.halo-toggle-row:last-child { border-bottom: 0; }
+.halo-toggle-row--featured { margin: 4px 0 8px; padding: 14px; border: 1px solid #c9ddef; border-radius: 16px; background: #f2f8fd; }
+.halo-toggle-row--featured .halo-toggle-copy strong { color: var(--halo-blue-dark); }
+.halo-test-ride-monitoring-card { overflow: hidden; border: 2px solid #a9cdec; background: linear-gradient(145deg, #fff 0%, #edf7ff 100%); box-shadow: 0 12px 30px rgba(22,92,150,.12); }
+.halo-test-ride-monitoring-card .halo-card-header { align-items: flex-start; }
+.halo-test-ride-monitoring-card .halo-toggle-row--featured { margin-top: 10px; border-color: rgba(25,112,184,.26); background: rgba(255,255,255,.72); }
+.halo-toggle-copy strong { display: block; margin-bottom: 2px; font-size: 14px; }
+.halo-toggle-copy small { display: block; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-switch { position: relative; width: 50px; height: 30px; }
+.halo-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.halo-switch span { display: block; width: 100%; height: 100%; border-radius: 999px; background: #d4d7d9; cursor: pointer; transition: background 160ms ease; }
+.halo-switch span::after { display: block; width: 26px; height: 26px; margin: 2px; border-radius: 50%; background: #fff; box-shadow: 0 1px 5px rgba(0,0,0,.22); content: ""; transition: transform 180ms var(--halo-ease); }
+.halo-switch input:checked + span { background: var(--halo-blue); }
+.halo-switch input:checked + span::after { transform: translateX(20px); }
+.halo-switch input:focus-visible + span { outline: 3px solid var(--halo-blue-dark); outline-offset: 3px; box-shadow: 0 0 0 5px #fff; }
+
+/* Route planning */
+.halo-view--ride { padding-left: max(14px, var(--halo-safe-left)); padding-right: max(14px, var(--halo-safe-right)); }
+.halo-route-form { position: relative; z-index: 4; display: grid; gap: 8px; margin-bottom: 12px; padding: 9px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); background: var(--halo-surface); box-shadow: var(--halo-shadow-sm); }
+.halo-location-field { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; }
+.halo-location-field + .halo-location-field { border-top: 1px solid var(--halo-line); }
+.halo-location-field input { min-height: 45px; padding: 9px 8px; border: 0; border-radius: 0; box-shadow: none !important; background: transparent; }
+.halo-route-dot { justify-self: center; width: 9px; height: 9px; border: 2px solid var(--halo-blue); border-radius: 50%; }
+.halo-route-dot--start { width: 7px; height: 7px; border: 0; background: var(--halo-ink-faint); }
+.halo-preflight-settings { display: grid; grid-template-columns: minmax(0, .78fr) minmax(0, 1.22fr); gap: 8px; padding-top: 8px; border-top: 1px solid var(--halo-line); }
+.halo-preflight-settings label { display: grid; align-content: center; min-height: 58px; padding: 8px 10px; border-radius: var(--halo-radius-sm); background: #f3f3f1; }
+.halo-preflight-settings label > span { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 4px; color: var(--halo-ink-soft); font-size: 10px; font-weight: 680; letter-spacing: .04em; text-transform: uppercase; }
+.halo-preflight-settings output { color: var(--halo-ink); font-size: 12px; font-weight: 720; letter-spacing: 0; }
+.halo-preflight-settings select { min-height: 32px; padding: 2px 26px 2px 0; border: 0; color: var(--halo-ink); background-color: transparent; box-shadow: none; font-size: 14px; font-weight: 620; }
+.halo-preflight-settings input[type="range"] { width: 100%; min-height: 28px; margin: 0; padding: 0; accent-color: var(--halo-blue); }
+.halo-route-submit { width: 100%; }
+
+.halo-map {
+	position: relative;
+	overflow: hidden;
+	height: clamp(260px, 43vh, 430px);
+	min-height: 260px;
+	border: 1px solid var(--halo-line);
+	border-radius: var(--halo-radius-lg);
+	background: #e7e6e2;
+}
+
+.halo-map[tabindex]:focus-visible,
+.halo-active-map[tabindex]:focus-visible { outline: 3px solid var(--halo-blue-dark); outline-offset: -5px; box-shadow: inset 0 0 0 2px #fff; }
+
+.halo-map-state {
+	position: absolute;
+	inset: 0;
+	z-index: 2;
+	display: grid;
+	place-content: center;
+	justify-items: center;
+	gap: 8px;
+	padding: 28px;
+	color: var(--halo-ink-soft);
+	background:
+		linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,.5) 49.5% 50.5%, transparent 50.5%),
+		linear-gradient(0deg, transparent 49.5%, rgba(255,255,255,.5) 49.5% 50.5%, transparent 50.5%),
+		#e8e7e3;
+	background-size: 72px 72px;
+	text-align: center;
+}
+
+.halo-map-state .halo-icon { width: 30px; height: 30px; color: var(--halo-blue); }
+.halo-map-state p { max-width: 260px; margin: 0; font-size: 13px; }
+.halo-map-state.is-error { color: #7c2727; background: #f7eceb; }
+
+/* Dependency-free Avenrà map renderer. */
+.halo-map__viewport {
+	position: absolute;
+	inset: 0;
+	overflow: hidden;
+	touch-action: none;
+	background: #dfe2df;
+	user-select: none;
+}
+
+.halo-map__scene {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	z-index: 1;
+	width: 100%;
+	height: 100%;
+	transform: translate(-50%, -50%);
+	transform-origin: 50% 50%;
+	will-change: transform;
+}
+
+.halo-map__tiles,
+.halo-map__overlay {
+	position: absolute;
+	inset: 0;
+	transform-origin: 0 0;
+}
+
+.halo-map__tiles { z-index: 1; }
+.halo-map__overlay { z-index: 2; overflow: visible; pointer-events: none; }
+
+.halo-map__tile {
+	position: absolute;
+	width: 256px;
+	height: 256px;
+	max-width: none !important;
+	border: 0;
+	image-rendering: auto;
+	-webkit-user-drag: none;
+	user-select: none;
+}
+
+.halo-map__route {
+	fill: none;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	vector-effect: non-scaling-stroke;
+}
+
+.halo-map__route--alternative {
+	stroke: rgba(66, 75, 82, 0.58);
+	stroke-width: 5;
+}
+
+.halo-map__route--selected {
+	stroke: var(--halo-blue);
+	stroke-width: 7;
+	filter: drop-shadow(0 2px 3px rgba(23, 109, 241, 0.22));
+}
+
+.halo-map__hazard {
+	stroke-width: 2;
+	vector-effect: non-scaling-stroke;
+}
+
+.halo-map__hazard--focus {
+	fill: rgba(166, 99, 8, 0.22);
+	stroke: #9b5d08;
+}
+
+.halo-map__hazard--community {
+	fill: rgba(207, 46, 46, 0.2);
+	stroke: var(--halo-red);
+}
+
+.halo-map__accuracy {
+	fill: rgba(23, 109, 241, 0.1);
+	stroke: rgba(23, 109, 241, 0.28);
+	stroke-width: 1;
+	vector-effect: non-scaling-stroke;
+}
+
+.halo-map__user-marker {
+	fill: var(--halo-blue);
+	stroke: #fff;
+	stroke-width: 3;
+	filter: drop-shadow(0 2px 5px rgba(5, 20, 42, 0.35));
+	vector-effect: non-scaling-stroke;
+}
+
+.halo-map__user-heading {
+	fill: var(--halo-blue);
+	stroke: #fff;
+	stroke-width: 3;
+	stroke-linejoin: round;
+	filter: drop-shadow(0 3px 6px rgba(5, 20, 42, 0.42));
+	vector-effect: non-scaling-stroke;
+}
+
+.halo-map__status {
+	position: absolute;
+	top: 10px;
+	left: 50%;
+	z-index: 5;
+	max-width: calc(100% - 24px);
+	min-height: 34px;
+	padding: 8px 12px;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	border-radius: 999px;
+	color: #fff;
+	background: rgba(22, 25, 28, 0.82);
+	box-shadow: 0 5px 18px rgba(0, 0, 0, 0.16);
+	font-size: 11px;
+	font-weight: 620;
+	text-align: center;
+	transform: translateX(-50%);
+	backdrop-filter: blur(12px);
+}
+
+.halo-map__attribution {
+	position: absolute;
+	right: 5px;
+	bottom: 4px;
+	z-index: 4;
+	padding: 2px 5px;
+	border-radius: 4px;
+	color: #51585d;
+	background: rgba(255, 255, 255, 0.78);
+	font-size: 8px;
+	line-height: 1.3;
+}
+
+.halo-map__attribution a { color: inherit; }
+.halo-map-zoom-controls { position: absolute; top: 12px; right: 12px; z-index: 9; display: grid; overflow: hidden; border: 1px solid rgba(18,22,25,.16); border-radius: 12px; background: rgba(255,255,255,.93); box-shadow: 0 6px 20px rgba(7,11,14,.16); backdrop-filter: blur(12px); }
+.halo-map-zoom-controls button { display: grid; place-items: center; width: 44px; height: 44px; padding: 0; border: 0; color: var(--halo-ink); background: transparent; font-size: 22px; font-weight: 500; line-height: 1; cursor: pointer; }
+.halo-map-zoom-controls button + button { border-top: 1px solid var(--halo-line); }
+.halo-map-zoom-controls button:active { background: rgba(23,109,241,.09); }
+.halo-map.is-initialized > .halo-map-state,
+.halo-map.is-initialized [data-map-state] { display: none !important; }
+.halo-map.is-degraded .halo-map__tiles,
+.halo-map.is-degraded .halo-map__overlay { filter: grayscale(1); opacity: 0.38; }
+.halo-map.is-degraded > .halo-map-state { display: grid !important; }
+
+.halo-route-results { display: grid; gap: 10px; margin-top: 12px; }
+.halo-route-option { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; width: 100%; min-height: 79px; padding: 14px 15px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); color: var(--halo-ink); background: var(--halo-surface); text-align: left; cursor: pointer; }
+.halo-route-option.is-selected { border-color: var(--halo-blue); box-shadow: 0 0 0 3px rgba(23,109,241,.09); }
+.halo-route-option strong { display: block; font-size: 15px; }
+.halo-route-option small { display: block; margin-top: 3px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-route-option > span:last-child { font-size: 18px; font-weight: 620; }
+
+.halo-route-options-bar { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 2px; }
+.halo-filter-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--halo-line); border-radius: 999px; color: var(--halo-ink-soft); background: var(--halo-surface-raised); font-size: 12px; font-weight: 620; cursor: pointer; }
+.halo-filter-chip .halo-icon { width: 16px; height: 16px; }
+.halo-filter-chip.is-active { color: var(--halo-blue-dark); border-color: rgba(11,85,202,.28); background: var(--halo-blue-pale); }
+.halo-route-start { display: grid; gap: 14px; }
+.halo-free-ride { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 11px; padding: 13px 15px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); background: var(--halo-surface); }
+.halo-free-ride strong { display: block; font-size: 14px; }
+.halo-free-ride small { display: block; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-free-ride .halo-button { flex: 0 0 auto; min-height: 42px; padding: 9px 13px; font-size: 12px; }
+.halo-ride-memory-setup { display: grid; gap: 0; margin-top: 12px; padding: 0 15px 13px; }
+.halo-ride-memory-setup .halo-toggle-row { padding-right: 0; padding-left: 0; }
+.halo-ride-memory-dual { border-top: 1px solid var(--halo-line); }
+.halo-ride-memory-storage { margin: 7px 0 0; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-camera-alignment-setup { display: grid; gap: 11px; padding: 14px 15px; }
+.halo-camera-alignment-setup__copy { display: grid; grid-template-columns: 42px minmax(0,1fr); align-items: center; gap: 11px; }
+.halo-camera-alignment-setup__copy strong,
+.halo-camera-alignment-setup__copy small { display: block; }
+.halo-camera-alignment-setup__copy strong { font-size: 14px; }
+.halo-camera-alignment-setup__copy small { margin-top: 2px; color: var(--halo-ink-faint); font-size: 11px; line-height: 1.4; }
+.halo-camera-alignment-setup__icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; color: #fff; background: #101316; }
+.halo-camera-alignment-setup__icon .halo-icon { width: 20px; height: 20px; }
+.halo-camera-alignment-setup .halo-button { min-height: 44px; }
+.halo-camera-alignment-setup .halo-helper { margin: -2px 0 0; }
+
+/* Activity */
+.halo-summary-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.halo-summary-metric { padding: 14px 10px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius-sm); background: var(--halo-surface); text-align: center; }
+.halo-summary-metric strong { display: block; font-size: 19px; font-weight: 610; }
+.halo-summary-metric small { color: var(--halo-ink-faint); font-size: 10px; }
+
+.halo-ride-list { display: grid; gap: 10px; }
+.halo-ride-item { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 74px; padding: 11px 14px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); color: var(--halo-ink); background: var(--halo-surface); text-align: left; cursor: pointer; }
+.halo-ride-item-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 14px; color: var(--halo-blue); background: var(--halo-blue-pale); }
+.halo-ride-item strong { display: block; font-size: 14px; }
+.halo-ride-item small { display: block; margin-top: 2px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-ride-item-distance { font-size: 15px; font-weight: 620; }
+
+.halo-ride-memory-library { display: grid; gap: 10px; }
+.halo-ride-memory-summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.halo-ride-memory-summary strong { display: block; font-size: 14px; }
+.halo-ride-memory-summary small { display: block; margin-top: 2px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-ride-memory-list { display: grid; gap: 10px; }
+.halo-ride-memory-item { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 11px; padding: 11px 12px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); background: var(--halo-surface); }
+.halo-ride-memory-item__icon { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 13px; color: #fff; background: #101316; }
+.halo-ride-memory-item__icon .halo-icon { width: 20px; height: 20px; }
+.halo-ride-memory-item__copy { min-width: 0; }
+.halo-ride-memory-item__copy strong,
+.halo-ride-memory-item__copy small { display: block; }
+.halo-ride-memory-item__copy strong { overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.halo-ride-memory-item__copy small { margin-top: 2px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-ride-memory-item__actions { display: flex; gap: 6px; }
+.halo-ride-memory-item__actions button { min-width: 42px; min-height: 42px; }
+.halo-ride-memory-recover { min-width: 132px !important; padding-inline: 14px; }
+.halo-ride-memory-player { display: grid; gap: 12px; }
+.halo-ride-memory-player__stage { position: relative; overflow: hidden; border-radius: var(--halo-radius-sm); background: #050607; box-shadow: 0 16px 36px rgba(7,10,12,.18); }
+.halo-ride-memory-player video { display: block; width: 100%; max-height: 58vh; border-radius: var(--halo-radius-sm); background: #050607; }
+.halo-ride-memory-player__secondary { position: absolute; z-index: 2; top: 12px; right: 12px; overflow: hidden; width: min(36%, 220px); border: 2px solid rgba(255,255,255,.9); border-radius: 14px; background: #050607; box-shadow: 0 10px 28px rgba(0,0,0,.38); }
+.halo-ride-memory-player__secondary[hidden] { display: none; }
+.halo-ride-memory-player__secondary video { width: 100%; max-height: none; aspect-ratio: 4 / 3; border-radius: 0; object-fit: cover; }
+.halo-ride-memory-player__view-label { position: absolute; z-index: 4; top: 7px; left: 8px; padding: 4px 7px; border: 1px solid rgba(255,255,255,.28); border-radius: 999px; color: #fff; background: rgba(5,7,8,.72); font-size: 8px; font-weight: 760; letter-spacing: .1em; line-height: 1; text-transform: uppercase; backdrop-filter: blur(8px); }
+.halo-ride-memory-player__view-label--primary { top: 12px; left: 12px; }
+.halo-ride-memory-player__view-label--primary[hidden] { display: none; }
+.halo-ride-memory-overlay { position: absolute; z-index: 3; right: 12px; bottom: 48px; left: 12px; display: grid; grid-template-columns: auto minmax(0,1fr); align-items: end; gap: 8px; pointer-events: none; }
+.halo-ride-memory-overlay[hidden] { display: none; }
+.halo-ride-memory-overlay__speed,
+.halo-ride-memory-overlay__detail { color: #fff; border: 1px solid rgba(255,255,255,.16); background: rgba(8,11,14,.8); box-shadow: 0 8px 24px rgba(0,0,0,.24); backdrop-filter: blur(10px); }
+.halo-ride-memory-overlay__speed { min-width: 76px; padding: 8px 10px 7px; border-radius: 15px; }
+.halo-ride-memory-overlay__speed strong { display: block; font-size: clamp(27px, 8vw, 42px); font-weight: 720; letter-spacing: -.045em; line-height: .9; font-variant-numeric: tabular-nums; }
+.halo-ride-memory-overlay__speed span,
+.halo-ride-memory-overlay__time span,
+.halo-ride-memory-overlay__location > span { display: block; margin-top: 4px; color: rgba(255,255,255,.64); font-size: 7px; font-weight: 720; letter-spacing: .09em; line-height: 1.25; text-transform: uppercase; }
+.halo-ride-memory-overlay__detail { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 11px; min-width: 0; padding: 9px 11px; border-radius: 15px; }
+.halo-ride-memory-overlay__time { padding-right: 11px; border-right: 1px solid rgba(255,255,255,.16); }
+.halo-ride-memory-overlay__time strong { font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.halo-ride-memory-overlay__location { min-width: 0; }
+.halo-ride-memory-overlay__location strong { display: block; overflow: hidden; font-size: 11px; line-height: 1.2; text-overflow: ellipsis; white-space: nowrap; }
+.halo-ride-memory-player__meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--halo-ink-soft); font-size: 12px; }
+.halo-ride-memory-player__cameras { display: flex; flex-wrap: wrap; gap: 7px; }
+.halo-ride-memory-player__cameras button { flex: 1 1 auto; min-height: 38px; padding: 7px 12px; }
+.halo-ride-memory-player__cameras button.is-active { color: #fff; border-color: #101316; background: #101316; }
+.halo-ride-memory-player__telemetry-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.halo-ride-memory-player__telemetry-controls button { min-height: 42px; padding-inline: 10px; font-size: 11px; }
+.halo-ride-memory-player__export-status:empty { display: none; }
+.halo-ride-memory-player__export-status { margin: -3px 0 0; color: var(--halo-ink-faint); font-size: 10px; line-height: 1.4; }
+.halo-ride-memory-player__controls { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.halo-empty-state { display: grid; place-content: center; justify-items: center; min-height: 260px; padding: 30px; border: 1px dashed var(--halo-line-strong); border-radius: var(--halo-radius); color: var(--halo-ink-soft); text-align: center; }
+.halo-empty-state .halo-icon { width: 34px; height: 34px; margin-bottom: 16px; color: var(--halo-blue); }
+.halo-empty-state h2 { font-size: 19px; }
+.halo-empty-state p { max-width: 300px; font-size: 13px; }
+
+/* Search, manual, docs, shop */
+.halo-search-field { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-items: center; gap: 5px; margin-bottom: 18px; padding: 0 12px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius-sm); background: var(--halo-surface); }
+.halo-search-field .halo-icon { color: var(--halo-ink-faint); }
+.halo-search-field input { min-height: 48px; padding: 10px 5px; border: 0; box-shadow: none !important; background: transparent; }
+
+.halo-accordion { overflow: hidden; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); background: var(--halo-surface); }
+.halo-accordion-item { border-bottom: 1px solid var(--halo-line); }
+.halo-accordion-item:last-child { border-bottom: 0; }
+.halo-accordion-button { display: grid; grid-template-columns: minmax(0, 1fr) 20px; align-items: center; gap: 15px; width: 100%; min-height: 60px; padding: 14px 16px; border: 0; color: var(--halo-ink); background: transparent; font-size: 14px; font-weight: 620; text-align: left; cursor: pointer; }
+.halo-accordion-button .halo-icon { width: 17px; height: 17px; color: var(--halo-ink-faint); transition: transform 180ms var(--halo-ease); }
+.halo-accordion-button[aria-expanded="true"] .halo-icon { transform: rotate(90deg); }
+.halo-accordion-panel { padding: 0 16px 17px; color: var(--halo-ink-soft); font-size: 13px; }
+.halo-accordion-panel > :last-child { margin-bottom: 0; }
+
+.halo-upload-zone { display: grid; place-content: center; justify-items: center; min-height: 160px; padding: 22px; border: 1px dashed var(--halo-line-strong); border-radius: var(--halo-radius); background: rgba(255,255,255,.45); text-align: center; cursor: pointer; }
+.halo-upload-zone .halo-icon { width: 30px; height: 30px; margin-bottom: 10px; color: var(--halo-blue); }
+.halo-upload-zone strong { font-size: 14px; }
+.halo-upload-zone small { margin-top: 4px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-upload-zone input { position: absolute; opacity: 0; pointer-events: none; }
+
+.halo-document-list { display: grid; gap: 9px; }
+.halo-document { display: grid; grid-template-columns: 40px minmax(0,1fr) auto; align-items: center; gap: 11px; min-height: 62px; padding: 9px 12px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius-sm); background: var(--halo-surface); }
+.halo-document > .halo-icon { color: var(--halo-blue); }
+.halo-document strong { display: block; font-size: 13px; }
+.halo-document small { display: block; color: var(--halo-ink-faint); font-size: 10px; }
+
+.halo-product-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 12px; }
+.halo-product-card { overflow: hidden; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); background: var(--halo-surface); }
+.halo-product-image { display: grid; place-items: center; aspect-ratio: 1 / .8; padding: 8px; background: #efefed; }
+.halo-product-image img { width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply; }
+.halo-product-placeholder { color: var(--halo-ink-faint); }
+.halo-product-info { padding: 13px; }
+.halo-product-info h3 { min-height: 42px; font-size: 14px; }
+.halo-product-info strong { display: block; margin-bottom: 10px; font-size: 14px; }
+.halo-product-info .halo-button { width: 100%; min-height: 42px; padding: 9px; font-size: 12px; }
+.halo-cart-button { position: relative; }
+.halo-cart-button span { position: absolute; top: -4px; right: -3px; display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border: 2px solid var(--halo-paper); border-radius: 999px; color: #fff; background: var(--halo-blue); font-size: 9px; }
+
+/* Active ride — deliberately above the app, below crash state. */
+html.halo-ride-focus,
+html.halo-ride-focus body { overscroll-behavior: none; }
+
+.halo-active-ride {
+	position: fixed;
+	inset: 0;
+	z-index: 500;
+	display: block;
+	overflow: hidden;
+	min-height: 100vh;
+	min-height: 100svh;
+	padding: 0;
+	color: #fff;
+	background: #0c0f12;
+	isolation: isolate;
+}
+
+.halo-active-ride::before,
+.halo-active-ride::after { position: absolute; right: 0; left: 0; z-index: 2; content: ""; pointer-events: none; }
+.halo-active-ride::before { top: 0; height: 190px; background: linear-gradient(180deg, rgba(4,7,10,.62), rgba(4,7,10,0)); }
+.halo-active-ride::after { bottom: 0; height: 48%; background: linear-gradient(0deg, rgba(4,7,10,.72), rgba(4,7,10,0)); }
+.halo-ride-guidance { position: absolute; top: calc(var(--halo-safe-top) + 10px); right: calc(var(--halo-safe-right) + 10px); left: calc(var(--halo-safe-left) + 10px); z-index: 30; display: grid; grid-template-columns: 58px minmax(0,1fr); align-items: center; gap: 13px; min-height: 96px; padding: 14px 17px; border: 1px solid rgba(255,255,255,.13); border-radius: 21px; background: rgba(12,16,20,.88); box-shadow: 0 12px 36px rgba(0,0,0,.32); backdrop-filter: blur(18px) saturate(1.08); }
+.halo-manoeuvre { font-size: 52px; font-weight: 300; line-height: 1; }
+.halo-ride-guidance p { margin-bottom: 3px; color: #72a8ff; font-size: 18px; font-weight: 650; }
+.halo-ride-guidance h1 { display: -webkit-box; overflow: hidden; margin: 0; font-size: clamp(20px, 5.5vw, 27px); line-height: 1.15; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.halo-ride-focus-status { display: flex; align-items: center; gap: 6px; margin-top: 7px; color: rgba(255,255,255,.62); font-size: 9px; font-weight: 700; letter-spacing: .075em; line-height: 1.2; text-transform: uppercase; }
+.halo-ride-focus-status span { width: 7px; height: 7px; border-radius: 50%; background: #62d890; box-shadow: 0 0 0 4px rgba(98,216,144,.12); }
+.halo-ride-focus-status.is-warning { color: #ffd994; }
+.halo-ride-focus-status.is-warning span { background: #ffbe4c; box-shadow: 0 0 0 4px rgba(255,190,76,.14); }
+.halo-active-map-wrap { position: absolute; inset: 0; min-height: 0; overflow: hidden; }
+.halo-active-map { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; border: 0; border-radius: 0; background: #20272d; }
+.halo-active-map > .halo-map-zoom-controls { display: none; }
+.halo-active-map .halo-map__attribution { top: calc(var(--halo-safe-top) + 150px); right: calc(var(--halo-safe-right) + 10px); bottom: auto; }
+.halo-active-map .halo-map__status { top: calc(var(--halo-safe-top) + 150px); }
+.halo-ride-status-stack { position: absolute; top: calc(var(--halo-safe-top) + 150px); left: calc(var(--halo-safe-left) + 10px); z-index: 12; display: grid; gap: 6px; width: min(calc(100% - var(--halo-safe-left) - var(--halo-safe-right) - 150px), 330px); pointer-events: none; }
+.halo-ride-degraded { max-width: 100%; padding: 9px 11px; border: 1px solid rgba(255,190,76,.34); border-radius: 12px; color: #fff1d5; background: rgba(91,54,5,.92); box-shadow: 0 5px 18px rgba(0,0,0,.24); font-size: 10px; font-weight: 620; line-height: 1.35; backdrop-filter: blur(12px); }
+.halo-incident-camera-status,
+.halo-ride-memory-status,
+.halo-test-ride-status,
+.halo-bms-ride-status { position: relative; justify-self: start; max-width: 100%; padding: 8px 11px 8px 25px; border: 1px solid rgba(255,255,255,.2); border-radius: 999px; color: #fff; background: rgba(12,16,20,.84); box-shadow: 0 5px 18px rgba(0,0,0,.24); font-size: 10px; font-weight: 650; line-height: 1.3; backdrop-filter: blur(12px); }
+.halo-incident-camera-status::before,
+.halo-ride-memory-status::before,
+.halo-bms-ride-status::before { position: absolute; top: 50%; left: 10px; width: 8px; height: 8px; border-radius: 50%; background: #ff4d4d; box-shadow: 0 0 0 3px rgba(255,77,77,.16); content: ""; transform: translateY(-50%); }
+.halo-test-ride-status::before { position: absolute; top: 50%; left: 10px; width: 8px; height: 8px; border-radius: 50%; background: #4d9dff; box-shadow: 0 0 0 3px rgba(77,157,255,.16); content: ""; transform: translateY(-50%); }
+.halo-incident-camera-status.is-warning,
+.halo-ride-memory-status.is-warning,
+.halo-test-ride-status.is-warning,
+.halo-bms-ride-status.is-warning { color: #fff1d5; border-color: rgba(255,190,76,.34); background: rgba(91,54,5,.92); }
+.halo-incident-camera-status.is-warning::before,
+.halo-ride-memory-status.is-warning::before,
+.halo-test-ride-status.is-warning::before,
+.halo-bms-ride-status.is-warning::before { background: #ffbe4c; box-shadow: 0 0 0 3px rgba(255,190,76,.16); }
+.halo-incident-camera-status.is-secured::before { background: #50d890; box-shadow: 0 0 0 3px rgba(80,216,144,.16); }
+.halo-test-ride-status.is-live::before { background: #50d890; box-shadow: 0 0 0 3px rgba(80,216,144,.16); }
+.halo-bms-ride-status.is-live::before { background: #50d890; box-shadow: 0 0 0 3px rgba(80,216,144,.16); }
+.halo-speed-card { position: absolute; left: calc(var(--halo-safe-left) + 12px); bottom: calc(var(--halo-safe-bottom) + 242px); z-index: 18; display: grid; place-items: center; align-content: center; width: 76px; height: 76px; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; color: #fff; background: rgba(10,14,18,.86); box-shadow: 0 8px 25px rgba(0,0,0,.28); backdrop-filter: blur(16px); }
+.halo-speed-card strong { font-variant-numeric: tabular-nums; font-size: 31px; font-weight: 650; line-height: .95; letter-spacing: -.055em; }
+.halo-speed-card span { margin-top: 4px; color: rgba(255,255,255,.62); font-size: 9px; font-weight: 680; letter-spacing: .08em; text-transform: uppercase; }
+.halo-active-map-controls { position: absolute; right: calc(var(--halo-safe-right) + 12px); bottom: calc(var(--halo-safe-bottom) + 242px); z-index: 18; display: grid; gap: 8px; }
+.halo-active-map-controls button { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; color: #fff; background: rgba(18,22,26,.88); box-shadow: 0 5px 18px rgba(0,0,0,.22); cursor: pointer; }
+.halo-active-map-controls button.is-active { border-color: rgba(255,255,255,.82); color: #101316; background: rgba(255,255,255,.96); }
+.halo-ride-data-overlay { position: absolute; right: calc(var(--halo-safe-right) + 10px); bottom: calc(var(--halo-safe-bottom) + 86px); left: calc(var(--halo-safe-left) + 10px); z-index: 24; overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 19px; background: rgba(10,14,18,.79); box-shadow: 0 12px 36px rgba(0,0,0,.32); backdrop-filter: blur(18px) saturate(1.08); }
+.halo-ride-performance { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1px; background: rgba(255,255,255,.1); }
+.halo-ride-performance > div { min-width: 0; padding: 7px 5px; background: rgba(10,14,18,.58); text-align: center; }
+.halo-ride-performance small { display: block; margin-bottom: 2px; color: rgba(255,255,255,.62); font-size: 10px; font-weight: 650; line-height: 1.15; letter-spacing: .06em; text-transform: uppercase; }
+.halo-ride-performance strong { display: block; overflow: hidden; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 620; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
+.halo-ride-hud { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; background: rgba(255,255,255,.12); }
+.halo-ride-hud.has-bms { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.halo-ride-hud > div { padding: 9px; background: rgba(15,19,23,.64); text-align: center; }
+.halo-ride-hud small { display: block; margin-bottom: 2px; color: rgba(255,255,255,.5); font-size: 10px; line-height: 1.15; text-transform: uppercase; letter-spacing: .08em; }
+.halo-ride-hud strong { font-size: 16px; line-height: 1.15; }
+
+@media (max-width: 380px) {
+	.halo-ride-hud.has-bms > div { padding-inline: 5px; }
+	.halo-ride-hud.has-bms strong { font-size: 14px; }
+}
+.halo-ride-controls { position: absolute; right: calc(var(--halo-safe-right) + 10px); bottom: calc(var(--halo-safe-bottom) + 10px); left: calc(var(--halo-safe-left) + 10px); z-index: 32; display: grid; grid-template-columns: 72px 72px minmax(0,1fr); align-items: center; gap: 9px; padding: 0; background: transparent; }
+.halo-ride-control { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 64px; border: 1px solid rgba(255,255,255,.17); border-radius: 16px; color: #fff; background: rgba(12,16,20,.87); box-shadow: 0 9px 28px rgba(0,0,0,.24); font-size: 10px; font-weight: 620; backdrop-filter: blur(16px); }
+.halo-hold-button { position: relative; overflow: hidden; min-height: 64px; padding: 10px 18px; border: 1px solid rgba(255,255,255,.17); border-radius: 16px; color: #fff; background: rgba(12,16,20,.9); box-shadow: 0 9px 28px rgba(0,0,0,.24); cursor: pointer; backdrop-filter: blur(16px); }
+.halo-hold-button > span { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(207,46,46,.8); pointer-events: none; }
+.halo-hold-button strong { position: relative; z-index: 1; font-size: 14px; }
+.halo-hold-button.is-holding > span { width: 100%; transition: width 2s linear; }
+html.halo-ride-active .halo-toast-region { top: calc(var(--halo-safe-top) + 150px); bottom: auto; }
+
+.halo-crash-state {
+	position: fixed;
+	inset: 0;
+	z-index: 2000;
+	display: flex;
+	align-items: flex-start;
+	justify-content: center;
+	overflow-x: hidden;
+	overflow-y: auto;
+	min-height: 100vh;
+	min-height: 100svh;
+	padding: calc(24px + var(--halo-safe-top)) calc(20px + var(--halo-safe-right)) calc(24px + var(--halo-safe-bottom)) calc(20px + var(--halo-safe-left));
+	color: #fff;
+	background: #a71919;
+	overscroll-behavior: contain;
+	-webkit-overflow-scrolling: touch;
+}
+
+.halo-crash-panel { display: grid; flex: 0 0 auto; justify-items: center; width: min(100%, 420px); margin-block: auto; text-align: center; }
+.halo-crash-panel > .halo-icon { width: 54px; height: 54px; margin-bottom: 24px; }
+.halo-crash-panel .halo-eyebrow { color: rgba(255,255,255,.68); }
+.halo-crash-panel h1 { font-size: 39px; }
+.halo-crash-panel > p:not(.halo-eyebrow) { color: rgba(255,255,255,.8); }
+.halo-crash-countdown-view,
+.halo-crash-active { display: grid; justify-items: center; width: 100%; }
+.halo-crash-countdown-view > p,
+.halo-crash-active > p { color: rgba(255,255,255,.82); }
+.halo-crash-countdown { display: grid; place-items: center; width: 110px; height: 110px; margin: 17px 0 26px; border: 2px solid rgba(255,255,255,.5); border-radius: 50%; font-size: 42px; font-weight: 650; }
+.halo-crash-actions { display: grid; justify-items: stretch; gap: 13px; width: 100%; }
+.halo-crash-panel .halo-button { width: 100%; }
+.halo-crash-panel small { margin-top: 19px; color: rgba(255,255,255,.63); font-size: 11px; }
+.halo-crash-active { gap: 15px; margin-top: 12px; }
+.halo-emergency-status { display: inline-flex; align-items: center; gap: 9px; min-height: 38px; padding: 8px 13px; border: 1px solid rgba(255,255,255,.32); border-radius: 999px; background: rgba(0,0,0,.12); font-size: 13px; }
+.halo-emergency-status span { width: 9px; height: 9px; border: 2px solid rgba(255,255,255,.45); border-radius: 50%; background: #fff; box-shadow: 0 0 0 5px rgba(255,255,255,.12); }
+.halo-emergency-detail { margin: -3px 0 2px; font-size: 13px; font-weight: 650; }
+.halo-emergency-caveat { padding: 13px 14px; border: 1px solid rgba(255,255,255,.23); border-radius: 14px; background: rgba(0,0,0,.12); font-size: 12px; }
+
+/* Dialogs and sheets */
+.halo-dialog,
+.halo-sheet {
+	width: 100%;
+	max-width: none;
+	height: 100%;
+	max-height: none;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	color: var(--halo-ink);
+	background: transparent;
+}
+
+.halo-dialog::backdrop,
+.halo-sheet::backdrop { background: rgba(7,10,12,.55); backdrop-filter: blur(4px); }
+
+.halo-dialog[open] { display: grid; place-items: center; padding: calc(18px + var(--halo-safe-top)) calc(14px + var(--halo-safe-right)) calc(18px + var(--halo-safe-bottom)) calc(14px + var(--halo-safe-left)); }
+.halo-dialog-panel { display: flex; flex-direction: column; overflow: hidden; width: min(100%, 560px); max-height: min(760px, 90svh); border-radius: var(--halo-radius-lg); background: var(--halo-surface); box-shadow: var(--halo-shadow-lg); animation: halo-dialog-in 240ms var(--halo-ease) both; }
+.halo-dialog-panel > header,
+.halo-sheet-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 15px; padding: 18px; border-bottom: 1px solid var(--halo-line); }
+.halo-dialog-panel > header h2,
+.halo-sheet-panel > header h2 { margin: 0; }
+.halo-dialog-panel > header .halo-eyebrow { margin: 0 0 4px; }
+.halo-dialog-content,
+.halo-sheet-content { overflow-y: auto; padding: 18px; overscroll-behavior: contain; }
+
+.halo-dialog.is-camera-alignment .halo-dialog-panel { width: min(100%, 720px); max-height: min(860px, 94svh); }
+.halo-camera-alignment { display: grid; gap: 13px; }
+.halo-camera-alignment__intro { margin: 0; color: var(--halo-ink-soft); font-size: 13px; line-height: 1.5; }
+.halo-camera-alignment__intro strong { color: var(--halo-ink); }
+.halo-camera-alignment__stage { display: grid; gap: 10px; }
+.halo-camera-alignment__placeholder { display: grid; place-items: center; align-content: center; gap: 10px; min-height: 250px; padding: 20px; border-radius: var(--halo-radius-sm); color: rgba(255,255,255,.78); background: #050607; text-align: center; }
+.halo-camera-alignment__placeholder[hidden] { display: none; }
+.halo-camera-alignment__placeholder .halo-icon { width: 30px; height: 30px; color: #fff; }
+.halo-camera-alignment__placeholder span { font-size: 12px; font-weight: 620; }
+.halo-camera-alignment__view { display: grid; gap: 6px; margin: 0; min-width: 0; }
+.halo-camera-alignment__view[hidden] { display: none; }
+.halo-camera-alignment__frame { position: relative; overflow: hidden; width: 100%; aspect-ratio: 4 / 3; border-radius: var(--halo-radius-sm); background: #050607; box-shadow: 0 13px 32px rgba(7,10,12,.2); }
+.halo-camera-alignment__frame video { display: block; width: 100%; height: 100%; background: #050607; object-fit: contain; transform: none; }
+.halo-camera-alignment__guide { position: absolute; inset: 0; pointer-events: none; box-shadow: inset 0 0 0 1px rgba(255,255,255,.34); }
+.halo-camera-alignment__guide::before,
+.halo-camera-alignment__guide::after { position: absolute; background: rgba(255,255,255,.7); box-shadow: 0 0 0 1px rgba(0,0,0,.18); content: ""; }
+.halo-camera-alignment__guide::before { top: 0; bottom: 0; left: 50%; width: 1px; transform: translateX(-.5px); }
+.halo-camera-alignment__guide::after { top: 50%; right: 0; left: 0; height: 1px; transform: translateY(-.5px); }
+.halo-camera-alignment__guide i { position: absolute; top: 50%; left: 50%; width: 26%; aspect-ratio: 1; border: 1px solid rgba(255,255,255,.78); border-radius: 50%; transform: translate(-50%, -50%); }
+.halo-camera-alignment__label { position: absolute; top: 9px; left: 9px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.24); border-radius: 999px; color: #fff; background: rgba(5,7,8,.72); font-size: 9px; font-weight: 760; letter-spacing: .08em; line-height: 1; text-transform: uppercase; backdrop-filter: blur(8px); }
+.halo-camera-alignment__view figcaption { padding: 0 2px; color: var(--halo-ink-faint); font-size: 10px; line-height: 1.4; }
+.halo-camera-alignment__switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.halo-camera-alignment__switch[hidden] { display: none; }
+.halo-camera-alignment__switch .halo-button { min-height: 42px; padding-inline: 9px; font-size: 11px; }
+.halo-camera-alignment__switch .halo-button.is-active { color: #fff; border-color: #101316; background: #101316; }
+.halo-camera-alignment__status { margin: 0; padding: 10px 12px; border-radius: 12px; color: var(--halo-blue-dark); background: var(--halo-blue-pale); font-size: 12px; font-weight: 620; line-height: 1.4; }
+.halo-camera-alignment__status.is-warning { color: #7e2a26; background: #fbebea; }
+.halo-camera-alignment > .halo-helper { margin: 0; }
+
+.halo-sheet[open] { display: flex; align-items: flex-end; justify-content: center; padding-top: calc(20px + var(--halo-safe-top)); }
+.halo-sheet-panel { display: flex; flex-direction: column; overflow: hidden; width: min(100%, 620px); max-height: 88svh; padding-bottom: var(--halo-safe-bottom); border-radius: 26px 26px 0 0; background: var(--halo-surface); box-shadow: var(--halo-shadow-lg); animation: halo-sheet-in 280ms var(--halo-ease) both; }
+.halo-sheet-handle { flex: 0 0 auto; width: 42px; height: 5px; margin: 9px auto -5px; border-radius: 999px; background: #d3d5d6; }
+
+@keyframes halo-dialog-in { from { opacity: 0; transform: scale(.96) translateY(8px); } }
+@keyframes halo-sheet-in { from { transform: translateY(100%); } }
+
+.halo-toast-region { position: fixed; right: max(14px, var(--halo-safe-right)); bottom: calc(var(--halo-nav-height) + var(--halo-safe-bottom) + 28px); left: max(14px, var(--halo-safe-left)); z-index: 1500; display: grid; justify-items: center; gap: 8px; pointer-events: none; }
+.halo-toast { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 10px; width: min(100%, 480px); min-height: 50px; padding: 11px 14px; border: 1px solid rgba(255,255,255,.08); border-radius: 14px; color: #fff; background: rgba(22,25,28,.96); box-shadow: 0 10px 35px rgba(0,0,0,.22); font-size: 13px; pointer-events: auto; animation: halo-toast-in 220ms var(--halo-ease) both; }
+.halo-toast.is-error { background: #8d2424; }
+.halo-toast.is-success { background: #126449; }
+.halo-toast .halo-icon { width: 18px; height: 18px; }
+@keyframes halo-toast-in { from { opacity: 0; transform: translateY(12px); } }
+
+/* Skeletons */
+.halo-skeleton,
+.halo-skeleton-row > span { position: relative; overflow: hidden; background: #e5e4e1; }
+.halo-skeleton::after,
+.halo-skeleton-row > span::after { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.58), transparent); content: ""; transform: translateX(-100%); animation: halo-shimmer 1.4s infinite; }
+.halo-skeleton--hero { height: 342px; border-radius: var(--halo-radius-lg); }
+.halo-skeleton-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.halo-skeleton-row > span { height: 105px; border-radius: var(--halo-radius); }
+@keyframes halo-shimmer { to { transform: translateX(100%); } }
+
+/* Halo Community */
+.halo-community-view .halo-detail-header { margin-bottom: 14px; }
+.halo-community-skeleton { height: 250px; border-radius: var(--halo-radius-lg); }
+
+.halo-community-hero {
+	position: relative;
+	display: grid;
+	grid-template-columns: 52px minmax(0, 1fr);
+	align-items: center;
+	gap: 15px;
+	overflow: hidden;
+	min-height: 142px;
+	padding: 20px;
+	border: 1px solid rgba(255, 255, 255, 0.09);
+	border-radius: 24px;
+	color: #fff;
+	background: radial-gradient(circle at 88% 15%, rgba(207, 46, 46, 0.34), transparent 38%), linear-gradient(145deg, #24282c 0%, #0b0d0f 78%);
+	box-shadow: 0 18px 44px rgba(8, 11, 13, 0.15), inset 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.halo-community-hero::after {
+	position: absolute;
+	right: -38px;
+	bottom: -58px;
+	width: 160px;
+	height: 160px;
+	border: 1px solid rgba(255, 255, 255, 0.08);
+	border-radius: 50%;
+	box-shadow: 0 0 0 22px rgba(255, 255, 255, 0.025), 0 0 0 48px rgba(255, 255, 255, 0.016);
+	content: "";
+	pointer-events: none;
+}
+
+.halo-community-hero > * { position: relative; z-index: 1; }
+.halo-community-hero .halo-eyebrow { margin-bottom: 5px; color: #f36c6c; }
+.halo-community-hero h2 { margin: 0 0 5px; font-size: 25px; }
+.halo-community-hero p:not(.halo-eyebrow) { max-width: 440px; margin: 0; color: rgba(255, 255, 255, 0.66); font-size: 12px; }
+.halo-community-hero--welcome { grid-template-columns: 58px minmax(0, 1fr); min-height: 190px; padding-block: 26px; }
+.halo-community-hero--welcome h2 { max-width: 410px; font-size: clamp(25px, 7vw, 34px); }
+
+.halo-community-mark {
+	display: grid;
+	place-items: center;
+	width: 52px;
+	height: 52px;
+	border: 1px solid rgba(255, 255, 255, 0.16);
+	border-radius: 17px;
+	background: rgba(255, 255, 255, 0.08);
+	box-shadow: inset 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.halo-community-mark .halo-icon { width: 27px; height: 27px; }
+.halo-community-handle { display: inline-flex; align-items: center; max-width: 100%; min-height: 30px; padding: 5px 10px; border: 1px solid rgba(255, 255, 255, 0.13); border-radius: 999px; color: rgba(255, 255, 255, 0.74); background: rgba(255, 255, 255, 0.06); font-size: 10px; font-weight: 680; overflow-wrap: anywhere; }
+.halo-community-hero > .halo-community-handle { grid-column: 1 / -1; justify-self: start; margin-top: -3px; }
+
+.halo-community-tabs { margin-top: -4px; margin-bottom: 3px; }
+.halo-community-tabs button { position: relative; display: inline-flex; align-items: center; gap: 7px; min-height: 44px; padding-inline: 13px; }
+.halo-community-tabs .halo-icon { width: 16px; height: 16px; }
+.halo-community-unread { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; color: #fff; background: var(--halo-red); font-size: 9px; font-weight: 760; }
+.halo-community-tabs .is-active .halo-community-unread { color: var(--halo-red); background: #fff; }
+.halo-community-panel { display: grid; gap: 15px; min-width: 0; }
+
+.halo-community-privacy { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 15px; border: 1px solid rgba(21, 128, 93, 0.15); border-radius: var(--halo-radius); color: #174c3c; background: #edf7f2; }
+.halo-community-privacy > .halo-icon { width: 36px; height: 36px; padding: 8px; border-radius: 12px; background: rgba(21, 128, 93, 0.09); }
+.halo-community-privacy strong { display: block; margin-bottom: 3px; font-size: 13px; }
+.halo-community-privacy p { margin: 0; color: #3d6659; font-size: 11px; line-height: 1.5; }
+.halo-community-privacy.is-compact { margin-top: 2px; padding: 12px; }
+
+.halo-community-form { display: grid; gap: 16px; }
+.halo-community-form .halo-card { display: grid; gap: 16px; }
+.halo-community-form .halo-field + .halo-field { margin-top: 0; }
+.halo-centered-copy { margin: -5px 0 0; text-align: center; }
+.halo-community-username { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; overflow: hidden; border: 1px solid var(--halo-line-strong); border-radius: 14px; background: rgba(255, 255, 255, 0.92); }
+.halo-community-username > span { padding-left: 14px; color: var(--halo-ink-faint); font-size: 17px; }
+.halo-community-username input { border: 0; border-radius: 0; background: transparent; box-shadow: none !important; }
+.halo-community-username:focus-within { border-color: var(--halo-blue); box-shadow: 0 0 0 3px rgba(23, 109, 241, 0.12); }
+
+.halo-community-check,
+.halo-community-consent { display: grid; grid-template-columns: 23px minmax(0, 1fr); align-items: start; gap: 11px; color: var(--halo-ink); cursor: pointer; }
+.halo-community-check input,
+.halo-community-consent input { width: 21px; height: 21px; margin: 1px 0 0; accent-color: var(--halo-graphite); }
+.halo-community-check strong { display: block; font-size: 13px; }
+.halo-community-check small { display: block; margin-top: 2px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-community-consent { padding: 15px; border: 1px solid var(--halo-line); border-radius: 15px; background: #fafaf8; font-size: 12px; line-height: 1.5; }
+
+.halo-community-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.halo-community-toolbar .halo-card-kicker { margin-bottom: 4px; }
+.halo-community-toolbar h2 { margin: 0; font-size: 21px; }
+.halo-community-toolbar > .halo-community-handle { color: var(--halo-ink-soft); border-color: var(--halo-line); background: #fff; }
+.halo-community-compact-button { min-height: 44px; padding: 9px 13px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+.halo-community-compact-button .halo-icon { width: 17px; height: 17px; }
+.halo-community-search { grid-template-columns: 24px minmax(0, 1fr); margin: 0; box-shadow: 0 8px 24px rgba(8, 11, 13, 0.025); }
+
+.halo-community-list { display: grid; overflow: hidden; border: 1px solid var(--halo-line); border-radius: 19px; background: var(--halo-surface); box-shadow: var(--halo-shadow-sm); }
+.halo-community-member { display: grid; grid-template-columns: minmax(0, 1fr) 44px; align-items: center; gap: 5px; min-height: 84px; padding: 10px 12px; border-bottom: 1px solid var(--halo-line); }
+.halo-community-member:last-child { border-bottom: 0; }
+.halo-community-member.is-blocked { opacity: 0.63; }
+.halo-community-member-main { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 12px; min-width: 0; min-height: 60px; padding: 3px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.halo-community-member-main strong,
+.halo-community-person-chip strong,
+.halo-community-conversation strong { display: block; overflow: hidden; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
+.halo-community-member-main small,
+.halo-community-person-chip small,
+.halo-community-conversation small { display: block; margin-top: 2px; color: var(--halo-ink-faint); font-size: 10px; }
+.halo-community-member-main em { display: -webkit-box; overflow: hidden; margin-top: 4px; color: var(--halo-ink-soft); font-size: 11px; font-style: normal; line-height: 1.35; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+
+.halo-community-avatar { display: inline-grid; place-items: center; flex: 0 0 auto; width: 48px; height: 48px; border: 1px solid rgba(255, 255, 255, 0.13); border-radius: 50%; color: #fff; background: linear-gradient(145deg, #34393e, #111416); box-shadow: 0 7px 18px rgba(8, 11, 13, 0.13); font-size: 12px; font-weight: 730; letter-spacing: 0.025em; }
+.halo-community-avatar--small { width: 36px; height: 36px; font-size: 10px; }
+.halo-community-avatar--large { width: 76px; height: 76px; font-size: 18px; }
+.halo-community-dm-button { color: var(--halo-ink); background: #f4f4f1; }
+
+.halo-community-thread { display: grid; gap: 10px; width: 100%; min-height: 128px; padding: 16px; border: 0; border-bottom: 1px solid var(--halo-line); background: transparent; text-align: left; cursor: pointer; }
+.halo-community-thread:last-child { border-bottom: 0; }
+.halo-community-thread-top { display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 10px; }
+.halo-community-thread-top strong { display: block; font-size: 15px; }
+.halo-community-thread-top small { display: block; margin-top: 2px; color: var(--halo-ink-faint); font-size: 10px; }
+.halo-community-thread-excerpt { display: -webkit-box; overflow: hidden; color: var(--halo-ink-soft); font-size: 12px; line-height: 1.45; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.halo-community-thread-meta { display: inline-flex; align-items: center; gap: 5px; color: var(--halo-ink-faint); font-size: 10px; font-weight: 620; }
+.halo-community-thread-meta .halo-icon { width: 14px; height: 14px; }
+
+.halo-community-inline-back { justify-self: start; }
+.halo-community-post { padding: 16px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); background: #fff; box-shadow: var(--halo-shadow-sm); }
+.halo-community-post--lead { border-radius: 21px; }
+.halo-community-post-header { display: grid; grid-template-columns: auto minmax(0, 1fr) 40px; align-items: center; gap: 10px; }
+.halo-community-post-header h2 { margin: 0 0 3px; font-size: 20px; overflow-wrap: anywhere; }
+.halo-community-post-header .halo-card-kicker { margin: 0 0 2px; }
+.halo-community-post-header strong { display: block; font-size: 13px; }
+.halo-community-post-header small { display: block; color: var(--halo-ink-faint); font-size: 9px; }
+.halo-community-post-header .halo-icon-button { width: 40px; height: 40px; color: var(--halo-ink-faint); background: transparent; }
+.halo-community-body { margin: 15px 0 0; color: var(--halo-ink-soft); font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; white-space: pre-wrap; }
+.halo-community-replies { display: grid; gap: 10px; }
+.halo-community-replies .halo-section-heading { margin-bottom: 3px; }
+
+.halo-community-composer { position: sticky; bottom: calc(var(--halo-nav-height) + var(--halo-safe-bottom) + 6px); z-index: 5; display: grid; grid-template-columns: minmax(0, 1fr) 48px; align-items: end; gap: 9px; padding: 10px; border: 1px solid var(--halo-line-strong); border-radius: 18px; background: rgba(255, 255, 255, 0.94); box-shadow: 0 14px 38px rgba(8, 11, 13, 0.13); backdrop-filter: blur(20px); }
+.halo-community-composer textarea { width: 100%; min-height: 48px; max-height: 150px; padding: 12px; border: 0; border-radius: 12px; background: #f1f1ee; font: inherit; font-size: 14px; resize: vertical; }
+.halo-community-composer > .halo-icon-button { width: 48px; height: 48px; border: 0; background: var(--halo-graphite); }
+
+.halo-community-conversation { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; min-height: 76px; padding: 11px 14px; border: 0; border-bottom: 1px solid var(--halo-line); background: transparent; text-align: left; cursor: pointer; }
+.halo-community-conversation:last-child { border-bottom: 0; }
+.halo-community-conversation.is-unread { background: linear-gradient(90deg, rgba(207, 46, 46, 0.055), transparent 65%); }
+.halo-community-conversation.is-unread strong { font-weight: 740; }
+.halo-community-conversation > span:nth-child(2) { min-width: 0; }
+.halo-community-conversation > span:nth-child(2) small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.halo-community-conversation > .halo-icon { width: 17px; height: 17px; color: var(--halo-ink-faint); }
+.halo-community-conversation-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.halo-community-person-chip { display: inline-grid; grid-template-columns: 36px minmax(0, 1fr); align-items: center; gap: 8px; min-width: 0; min-height: 48px; padding: 5px 8px; border: 1px solid var(--halo-line); border-radius: 999px; background: #fff; text-align: left; cursor: pointer; }
+
+.halo-community-message-list { display: flex; flex-direction: column; gap: 9px; min-height: 270px; padding: 18px 4px; border-top: 1px solid var(--halo-line); border-bottom: 1px solid var(--halo-line); }
+.halo-community-message { align-self: flex-start; max-width: 83%; padding: 10px 12px 8px; border: 1px solid var(--halo-line); border-radius: 7px 17px 17px 17px; background: #fff; box-shadow: 0 5px 14px rgba(8, 11, 13, 0.04); }
+.halo-community-message.is-mine { align-self: flex-end; color: #fff; border-color: var(--halo-graphite); border-radius: 17px 7px 17px 17px; background: var(--halo-graphite); }
+.halo-community-message p { margin: 0; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.halo-community-message small { display: block; margin-top: 4px; color: var(--halo-ink-faint); font-size: 8px; text-align: right; }
+.halo-community-message.is-mine small { color: rgba(255, 255, 255, 0.55); }
+.halo-community-message button { min-height: 30px; margin: 3px 0 -4px; padding: 2px 0; border: 0; color: var(--halo-red); background: transparent; font-size: 9px; }
+
+.halo-community-muted { margin: 0; padding: 14px; color: var(--halo-ink-faint); font-size: 12px; text-align: center; }
+.halo-community-empty { min-height: 230px; background: rgba(255, 255, 255, 0.38); }
+.halo-community-loading { display: grid; place-content: center; justify-items: center; min-height: 250px; padding: 30px; border: 1px solid var(--halo-line); border-radius: 21px; background: rgba(255, 255, 255, 0.58); text-align: center; }
+.halo-community-loading-mark { width: 36px; height: 36px; margin-bottom: 14px; border: 2px solid #d5d5d2; border-top-color: var(--halo-red); border-radius: 50%; animation: halo-spin 800ms linear infinite; }
+.halo-community-loading strong { font-size: 13px; }
+.halo-community-loading-lines { display: grid; gap: 6px; width: 150px; margin-top: 17px; }
+.halo-community-loading-lines i { position: relative; overflow: hidden; height: 7px; border-radius: 999px; background: #e5e4e1; }
+.halo-community-loading-lines i:nth-child(2) { width: 78%; }
+.halo-community-loading-lines i:nth-child(3) { width: 58%; }
+.halo-community-loading-lines i::after { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #fff, transparent); content: ""; animation: halo-shimmer 1.3s infinite; }
+
+.halo-community-sheet-profile { display: grid; justify-items: center; padding: 8px 10px 18px; text-align: center; }
+.halo-community-sheet-profile .halo-community-handle { margin: 10px 0; color: var(--halo-ink-soft); border-color: var(--halo-line); background: #f6f6f3; }
+.halo-community-sheet-profile > p:last-child { max-width: 360px; margin: 0; color: var(--halo-ink-soft); font-size: 13px; }
+.halo-community-recipient { display: grid; grid-template-columns: 48px minmax(0, 1fr); align-items: center; gap: 12px; padding: 12px; border: 1px solid var(--halo-line); border-radius: var(--halo-radius); background: #f8f8f5; }
+.halo-community-recipient strong { display: block; font-size: 14px; }
+.halo-community-recipient small { color: var(--halo-ink-faint); font-size: 10px; }
+.halo-community-leave h3 { margin-bottom: 5px; }
+.halo-community-leave p { margin: 0; color: var(--halo-ink-soft); font-size: 12px; }
+.halo-community-leave .halo-text-button { justify-self: start; margin-top: 5px; }
+.halo-menu-icon--community { color: #fff; background: linear-gradient(145deg, #34393e, #111416); }
+
+.halo-community-home-card { display: grid; grid-template-columns: 48px minmax(0, 1fr) 20px; align-items: center; gap: 13px; width: 100%; min-height: 104px; padding: 16px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; color: #fff; background: radial-gradient(circle at 86% 12%, rgba(207, 46, 46, 0.28), transparent 35%), linear-gradient(145deg, #24282c, #0b0d0f); box-shadow: 0 15px 36px rgba(8, 11, 13, 0.14); text-align: left; cursor: pointer; }
+.halo-community-home-icon { display: grid; place-items: center; width: 48px; height: 48px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 15px; background: rgba(255, 255, 255, 0.07); }
+.halo-community-home-card small { display: block; margin-bottom: 3px; color: #f36c6c; font-size: 9px; font-weight: 720; letter-spacing: 0.12em; }
+.halo-community-home-card strong { display: block; font-size: 15px; }
+.halo-community-home-card em { display: block; margin-top: 3px; color: rgba(255, 255, 255, 0.58); font-size: 10px; font-style: normal; }
+.halo-community-home-card > .halo-icon { width: 17px; height: 17px; color: rgba(255, 255, 255, 0.54); }
+
+/* Install/update and utility */
+.halo-callout { display: grid; grid-template-columns: 38px minmax(0,1fr); gap: 12px; padding: 14px; border: 1px solid rgba(23,109,241,.13); border-radius: var(--halo-radius); background: var(--halo-blue-pale); }
+.halo-callout .halo-icon { margin-top: 1px; color: var(--halo-blue); }
+.halo-callout h3 { font-size: 14px; }
+.halo-callout p { margin: 0; color: var(--halo-ink-soft); font-size: 12px; }
+.halo-callout .halo-button { grid-column: 1 / -1; min-height: 42px; }
+.halo-callout--dark { color: #fff; border-color: rgba(255,255,255,.08); background: radial-gradient(circle at 90% 0%, rgba(23,109,241,.28), transparent 42%), linear-gradient(145deg, #24292d, #0b0d0f 76%); box-shadow: 0 18px 42px rgba(8,11,13,.14); }
+.halo-callout--dark .halo-icon { color: #8db8ff; }
+.halo-callout--dark h3 { color: #fff; }
+.halo-callout--dark p { color: rgba(255,255,255,.67); }
+
+.halo-auth-install { display: grid; gap: 8px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--halo-line); }
+.halo-auth-install .halo-button { justify-content: center; min-height: 50px; }
+.halo-auth-install .halo-button .halo-icon { width: 18px; height: 18px; }
+.halo-auth-install > p { margin: 0; padding-inline: 8px; color: var(--halo-ink-faint); font-size: 11px; line-height: 1.45; text-align: center; }
+.halo-install-card { grid-template-columns: 44px minmax(0,1fr); padding: 17px; border-color: rgba(16,18,20,.1); background: linear-gradient(145deg, #fff, #f5f6f6); box-shadow: var(--halo-shadow-sm); }
+.halo-install-card > .halo-icon { display: grid; place-self: start; width: 42px; height: 42px; padding: 10px; border-radius: 14px; color: #fff; background: linear-gradient(145deg, #2f3438, #101214); box-shadow: 0 9px 20px rgba(8,11,13,.17); }
+.halo-install-card h3 { margin-bottom: 4px; font-size: 16px; }
+.halo-install-card p { font-size: 12px; line-height: 1.45; }
+.halo-install-card .halo-button { min-height: 48px; }
+.halo-install-instructions { display: grid; grid-template-columns: 48px minmax(0,1fr); gap: 14px; }
+.halo-install-instructions > .halo-icon { width: 48px; height: 48px; padding: 13px; border-radius: 16px; color: #fff; background: var(--halo-graphite); box-shadow: 0 12px 28px rgba(8,11,13,.18); }
+.halo-install-instructions h3 { margin: 0 0 6px; font-size: 20px; }
+.halo-install-instructions > div > p:not(.halo-eyebrow) { margin: 0; color: var(--halo-ink-soft); font-size: 13px; }
+.halo-install-instructions ol { grid-column: 1 / -1; display: grid; gap: 9px; margin: 7px 0 0; padding: 0; list-style: none; }
+.halo-install-instructions li { display: grid; grid-template-columns: 31px minmax(0,1fr); align-items: center; gap: 11px; min-height: 52px; padding: 9px 12px; border: 1px solid var(--halo-line); border-radius: 14px; background: #f7f7f4; }
+.halo-install-instructions li > span { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 50%; color: #fff; background: var(--halo-graphite); font-size: 11px; font-weight: 720; }
+.halo-install-instructions li p { margin: 0; color: var(--halo-ink-soft); font-size: 13px; }
+.halo-install-instructions__retry { grid-column: 1 / -1; display: grid; gap: 7px; margin-top: 3px; }
+.halo-install-instructions__retry .halo-button { min-height: 50px; }
+.halo-install-instructions__retry > p { margin: 0 5px; color: var(--halo-ink-faint); font-size: 10px; line-height: 1.45; text-align: center; }
+.halo-install-note { grid-column: 1 / -1; margin: 3px 3px 0; color: var(--halo-ink-faint); font-size: 10px; line-height: 1.5; }
+.halo-install-instructions--installed { justify-items: center; grid-template-columns: 1fr; padding: 10px 6px 14px; text-align: center; }
+.halo-install-instructions--installed > * { max-width: 380px; }
+.halo-install-instructions--installed > p { margin: 0; color: var(--halo-ink-soft); font-size: 13px; }
+.halo-install-instructions--installed > small { color: var(--halo-ink-faint); font-size: 10px; }
+.halo-install-handoff { display: grid; grid-template-columns: 54px minmax(0,1fr); gap: 15px; }
+.halo-install-handoff__mark { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 18px; color: #fff; background: radial-gradient(circle at 70% 22%, #4b9dff, transparent 22%), linear-gradient(145deg, #202730, #080a0d); box-shadow: 0 13px 30px rgba(8,11,13,.22); }
+.halo-install-handoff__mark .halo-icon { width: 25px; height: 25px; }
+.halo-install-handoff__intro h3 { margin: 1px 0 6px; font-size: 22px; letter-spacing: -.025em; }
+.halo-install-handoff__intro > p:not(.halo-eyebrow) { margin: 0; color: var(--halo-ink-soft); font-size: 13px; line-height: 1.55; }
+.halo-install-handoff__benefits { grid-column: 1 / -1; display: grid; gap: 7px; margin: 5px 0 0; padding: 0; list-style: none; }
+.halo-install-handoff__benefits li { display: flex; align-items: center; gap: 9px; min-height: 39px; padding: 8px 11px; border: 1px solid var(--halo-line); border-radius: 13px; background: #f7f7f4; color: var(--halo-ink-soft); font-size: 12px; font-weight: 650; }
+.halo-install-handoff__benefits .halo-icon { flex: 0 0 18px; width: 18px; height: 18px; color: var(--halo-blue); }
+.halo-install-handoff__compatibility { grid-column: 1 / -1; display: grid; grid-template-columns: 24px minmax(0,1fr); gap: 10px; margin: 2px 0 0; padding: 12px; border: 1px solid rgba(23,109,241,.17); border-radius: 14px; background: var(--halo-blue-pale); color: var(--halo-ink-soft); font-size: 11px; line-height: 1.5; }
+.halo-install-handoff__compatibility .halo-icon { width: 21px; height: 21px; margin-top: 1px; color: var(--halo-blue); }
+.halo-install-handoff__compatibility strong { display: block; color: var(--halo-ink); font-size: 12px; }
+.halo-install-handoff__action { grid-column: 1 / -1; display: grid; gap: 7px; margin-top: 2px; }
+.halo-install-handoff__action .halo-button { min-height: 52px; }
+.halo-install-handoff__action > p { margin: 0; color: var(--halo-ink-faint); font-size: 10px; line-height: 1.45; text-align: center; }
+.halo-install-handoff > .halo-install-note { grid-column: 1 / -1; margin-top: 0; text-align: center; }
+
+.halo-guardian-setup { overflow: hidden; }
+.halo-guardian-setup [data-guardian-setup-details] { display: grid; gap: 11px; padding-top: 7px; }
+.halo-guardian-capability-warning,
+.halo-guardian-privacy { display: grid; grid-template-columns: 23px minmax(0,1fr); gap: 10px; padding: 12px; border: 1px solid var(--halo-line); border-radius: 14px; background: #f7f8f8; }
+.halo-guardian-capability-warning { color: #74460b; border-color: rgba(166,99,8,.2); background: #fff8e9; }
+.halo-guardian-capability-warning .halo-icon,
+.halo-guardian-privacy .halo-icon { width: 20px; height: 20px; margin-top: 1px; }
+.halo-guardian-privacy .halo-icon { color: var(--halo-blue-dark); }
+.halo-guardian-capability-warning p,
+.halo-guardian-privacy p { margin: 0; }
+.halo-guardian-capability-warning strong,
+.halo-guardian-privacy strong { display: block; margin-bottom: 2px; font-size: 12px; }
+.halo-guardian-capability-warning span,
+.halo-guardian-privacy span { display: block; color: var(--halo-ink-soft); font-size: 10px; line-height: 1.45; }
+.halo-guardian-active-note { display: grid; grid-template-columns: 30px minmax(0,1fr); align-items: center; gap: 10px; margin: 13px 0 0; padding: 12px; border: 1px solid rgba(23,109,241,.16); border-radius: 14px; background: var(--halo-blue-pale); }
+.halo-guardian-active-note > .halo-icon { width: 22px; height: 22px; color: var(--halo-blue-dark); }
+.halo-guardian-active-note strong,
+.halo-guardian-active-note small { display: block; }
+.halo-guardian-active-note strong { font-size: 12px; }
+.halo-guardian-active-note small { margin-top: 2px; color: var(--halo-ink-soft); font-size: 10px; line-height: 1.4; }
+.halo-guardian-resume-prompt { display: grid; justify-items: center; text-align: center; }
+.halo-guardian-resume-prompt > .halo-icon { width: 52px; height: 52px; margin-bottom: 17px; padding: 13px; border-radius: 18px; color: #fff; background: linear-gradient(145deg, #257cf3, #0b55ca); box-shadow: 0 14px 32px rgba(11,85,202,.25); }
+.halo-guardian-resume-prompt > p { max-width: 390px; margin-bottom: 11px; color: var(--halo-ink-soft); font-size: 13px; line-height: 1.55; }
+.halo-guardian-resume-prompt > p strong { color: var(--halo-ink); }
+.halo-guardian-resume-prompt .halo-button-stack { width: 100%; }
+.halo-guardian-resume-prompt > small { margin-top: 14px; color: var(--halo-ink-faint); font-size: 10px; }
+
+.halo-guardian-sharing { position: fixed; left: 50%; bottom: calc(var(--halo-nav-height) + var(--halo-safe-bottom) + 20px); z-index: 95; display: grid; grid-template-columns: 38px minmax(0,1fr) auto; align-items: center; gap: 11px; width: min(calc(100% - 24px - var(--halo-safe-left) - var(--halo-safe-right)), 720px); min-height: 72px; padding: 10px 11px; border: 1px solid rgba(255,255,255,.13); border-radius: 20px; color: #fff; background: radial-gradient(circle at 5% 0%, rgba(60,130,244,.38), transparent 44%), rgba(12,16,19,.96); box-shadow: 0 20px 55px rgba(5,8,10,.32); transform: translateX(-50%); backdrop-filter: blur(22px) saturate(1.12); }
+.halo-guardian-sharing.is-error { background: rgba(88,42,15,.97); }
+.halo-guardian-sharing__icon { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid rgba(255,255,255,.14); border-radius: 13px; background: rgba(255,255,255,.08); }
+.halo-guardian-sharing__icon .halo-icon { width: 20px; height: 20px; }
+.halo-guardian-sharing__copy { min-width: 0; }
+.halo-guardian-sharing__copy strong,
+.halo-guardian-sharing__copy small { display: block; }
+.halo-guardian-sharing__copy strong { font-size: 12px; }
+.halo-guardian-sharing__copy small { overflow: hidden; margin-top: 2px; color: rgba(255,255,255,.66); font-size: 9px; line-height: 1.35; text-overflow: ellipsis; }
+.halo-guardian-sharing .halo-button { min-height: 42px; padding: 8px 13px; font-size: 11px; }
+.halo-app.is-guardian-tracking .halo-main { padding-bottom: calc(var(--halo-nav-height) + var(--halo-safe-bottom) + 125px); }
+
+.halo-error-state { padding: 22px; border: 1px solid rgba(207,46,46,.16); border-radius: var(--halo-radius); color: #7b2828; background: #fff2f1; text-align: center; }
+.halo-error-state h2 { font-size: 18px; }
+.halo-error-state p { font-size: 13px; }
+
+.halo-divider { height: 1px; margin: 5px 0; border: 0; background: var(--halo-line); }
+.halo-danger { color: var(--halo-red) !important; }
+.halo-button.halo-danger { --halo-spinner: var(--halo-red); }
+.halo-full-width { width: 100%; }
+
+.halo-action-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.halo-button-stack { display: grid; gap: 10px; margin-top: 16px; }
+.halo-file-button { position: relative; overflow: hidden; cursor: pointer; }
+.halo-file-button input { position: absolute; opacity: 0; pointer-events: none; }
+.halo-mode-mapping { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 16px; }
+.halo-profile-summary { display: grid; grid-template-columns: 52px minmax(0,1fr) 44px; align-items: center; gap: 13px; }
+.halo-profile-summary h2 { margin: 0 0 3px; font-size: 18px; }
+.halo-profile-summary p { margin: 0; color: var(--halo-ink-soft); font-size: 12px; overflow-wrap: anywhere; }
+.halo-profile-avatar { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; color: #fff; background: var(--halo-graphite); font-size: 14px; font-weight: 720; }
+.halo-version { margin: 3px 0 0; color: var(--halo-ink-faint); font-size: 10px; text-align: center; }
+.halo-cart-list { display: grid; gap: 2px; }
+.halo-cart-line { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px 15px; padding: 14px 0; border-bottom: 1px solid var(--halo-line); }
+.halo-cart-line strong { display: block; font-size: 14px; }
+.halo-cart-line small { display: block; margin-top: 2px; color: var(--halo-ink-faint); font-size: 11px; }
+.halo-cart-line > span { font-size: 13px; font-weight: 620; }
+.halo-cart-line > button { grid-column: 1 / -1; justify-self: start; min-height: 34px; padding: 3px 0; }
+.halo-cart-total { display: flex; align-items: center; justify-content: space-between; margin: 15px 0; font-size: 17px; }
+.halo-hazard-grid .halo-action-card { min-height: 96px; }
+
+.halo-public-tracking { min-height: 100vh; min-height: 100svh; padding: calc(22px + var(--halo-safe-top)) max(18px, var(--halo-safe-right)) calc(24px + var(--halo-safe-bottom)) max(18px, var(--halo-safe-left)); background: var(--halo-paper); }
+.halo-public-tracking > header,
+.halo-public-tracking > main { width: min(100%, 640px); margin: 0 auto; }
+.halo-public-tracking > header { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 22px; }
+.halo-public-tracking > header .halo-brand-logo { flex: 0 0 auto; }
+.halo-public-tracking > header .halo-eyebrow { margin: 0; }
+.halo-public-tracking > main { display: grid; gap: 14px; }
+.halo-live-status { display: grid; grid-template-columns: minmax(0,1fr); }
+.halo-live-status .halo-status-dot { display: inline-block; margin-right: 7px; background: var(--halo-green); box-shadow: 0 0 0 5px rgba(21,128,93,.1); }
+.halo-live-status .halo-status-dot.is-stale { background: var(--halo-amber); box-shadow: 0 0 0 5px rgba(166,99,8,.1); }
+.halo-live-status .halo-status-dot.is-waiting { background: #858b90; box-shadow: 0 0 0 5px rgba(81,87,92,.09); }
+.halo-live-status .halo-card-kicker { display: inline; }
+.halo-live-status h1 { margin-top: 10px; font-size: 27px; }
+.halo-guardian-recovery { display: grid; gap: 12px; margin-top: 17px; padding: 15px; border: 1px solid rgba(23,109,241,.18); border-radius: 17px; background: linear-gradient(145deg, #f5f9ff, #edf4ff); }
+.halo-guardian-recovery__heading { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 10px; }
+.halo-guardian-recovery__heading > .halo-icon { width: 32px; height: 32px; padding: 7px; border-radius: 11px; color: #fff; background: var(--halo-blue); }
+.halo-guardian-recovery__heading strong { display: block; font-size: 14px; }
+.halo-guardian-recovery__heading p { margin: 3px 0 0; color: var(--halo-ink-soft); font-size: 11px; line-height: 1.45; }
+.halo-guardian-recovery .halo-button { min-height: 50px; }
+.halo-guardian-recovery__status { min-height: 16px; margin: -2px 0 0; color: var(--halo-blue-dark); font-size: 11px; font-weight: 650; text-align: center; }
+.halo-guardian-recovery > small { color: var(--halo-ink-faint); font-size: 9px; line-height: 1.45; text-align: center; }
+.halo-public-telemetry { overflow: hidden; border: 1px solid rgba(255,255,255,.07); border-radius: 24px; color: #fff; background: radial-gradient(circle at 12% 0%, rgba(47,58,65,.72), transparent 42%), linear-gradient(145deg, #181c1f, #0d0f11 72%); box-shadow: 0 24px 60px rgba(8,11,13,.16); transition: opacity 180ms var(--halo-ease); }
+.halo-public-telemetry.is-stale { opacity: .78; }
+.halo-public-telemetry dl { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 1px; margin: 0; background: rgba(255,255,255,.1); }
+.halo-public-telemetry__metric { min-width: 0; padding: 20px; background: rgba(13,15,17,.9); }
+.halo-public-telemetry__metric--speed { background: linear-gradient(145deg, rgba(27,34,39,.98), rgba(13,15,17,.94)); }
+.halo-public-telemetry__metric--road { grid-column: 1 / -1; padding-block: 18px 20px; }
+.halo-public-telemetry dt { margin: 0 0 7px; color: rgba(255,255,255,.57); font-size: 10px; font-weight: 720; letter-spacing: .12em; line-height: 1.25; text-transform: uppercase; }
+.halo-public-telemetry dd { display: flex; align-items: baseline; gap: 6px; min-width: 0; margin: 0; font-variant-numeric: tabular-nums; }
+.halo-public-telemetry dd strong { overflow: hidden; font-size: clamp(31px, 10vw, 44px); font-weight: 660; letter-spacing: -.045em; line-height: 1; text-overflow: ellipsis; }
+.halo-public-telemetry dd span { color: rgba(255,255,255,.62); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
+.halo-public-telemetry__metric--road dd { display: block; overflow-wrap: anywhere; font-size: 19px; font-weight: 620; letter-spacing: -.015em; line-height: 1.25; }
+.halo-public-telemetry > p { margin: 0; padding: 12px 18px 13px; border-top: 1px solid rgba(255,255,255,.08); color: rgba(255,255,255,.52); background: rgba(8,10,11,.76); font-size: 10px; line-height: 1.45; }
+.halo-public-track-map { height: min(54vh, 470px); min-height: 300px; }
+.halo-public-privacy { margin: 0; padding: 0 8px; color: var(--halo-ink-faint); font-size: 11px; text-align: center; }
+
+@media (max-width: 480px) {
+	.halo-hero--product-stage { padding-inline: 20px; }
+	.halo-hero--product-stage .halo-hero-footer { grid-template-columns: 1fr; align-items: stretch; }
+	#avenra-halo-v2.halo-app button.halo-hero-action { width: 100%; white-space: normal; }
+}
+
+@media (max-width: 380px) {
+	.halo-hero-footer { grid-template-columns: 1fr; align-items: stretch; }
+	.halo-app .halo-hero-action { width: 100%; white-space: normal; }
+}
+
+@media (max-width: 350px) {
+	.halo-hero--product-stage { padding-inline: 17px; border-radius: 27px; }
+	.halo-hero--product-stage .halo-bike-visual { height: 158px; border-radius: 20px; }
+}
+
+@media (max-width: 360px) {
+	.halo-guardian-sharing { grid-template-columns: 34px minmax(0,1fr) auto; gap: 8px; padding-inline: 9px; }
+	.halo-guardian-sharing__icon { width: 34px; height: 34px; }
+	.halo-guardian-sharing .halo-button { padding-inline: 10px; }
+}
+
+@media (min-width: 520px) {
+	.halo-field-row { grid-template-columns: repeat(2, minmax(0,1fr)); }
+	.halo-hero { min-height: 340px; }
+	.halo-bike-visual { height: 175px; }
+	.halo-hero--compact { min-height: 270px; }
+	.halo-hero--compact .halo-bike-visual { height: 126px; }
+	.halo-metric-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+	.halo-metric { min-height: 116px; }
+	.halo-mode-mapping { grid-template-columns: repeat(3, minmax(0,1fr)); }
+	.halo-bottom-nav { right: auto; left: 50%; width: min(calc(100% - 24px), 736px); transform: translateX(-50%); }
+}
+
+@media (min-width: 620px) {
+	.halo-camera-alignment__stage.is-dual { grid-template-columns: repeat(2, minmax(0,1fr)); align-items: start; }
+}
+
+@media (min-width: 700px) {
+	.halo-action-grid { grid-template-columns: repeat(4, minmax(0,1fr)); }
+}
+
+@media (min-width: 820px) {
+	.halo-app { background: #ecebe8; }
+	.halo-product { width: min(100%, 820px); margin: 0 auto; border-right: 1px solid var(--halo-line); border-left: 1px solid var(--halo-line); box-shadow: 0 0 80px rgba(10,13,15,.06); }
+	.halo-topbar { left: 50%; width: min(100%, 820px); transform: translateX(-50%); }
+}
+
+@media (max-width: 360px) {
+	.halo-community-hero { grid-template-columns: 44px minmax(0, 1fr); gap: 11px; padding: 16px; }
+	.halo-community-mark { width: 44px; height: 44px; border-radius: 14px; }
+	.halo-community-hero h2 { font-size: 22px; }
+	.halo-community-toolbar { align-items: flex-start; }
+	.halo-community-compact-button { padding-inline: 11px; }
+	.halo-community-member { padding-inline: 9px; }
+	.halo-community-home-card { grid-template-columns: 42px minmax(0, 1fr) 16px; gap: 10px; padding: 13px; }
+	.halo-community-home-icon { width: 42px; height: 42px; }
+	.halo-preflight-settings { grid-template-columns: 1fr; }
+	.halo-free-ride { align-items: stretch; flex-direction: column; }
+	.halo-free-ride .halo-button { width: 100%; }
+	.halo-ride-controls { grid-template-columns: 62px 62px minmax(0,1fr); }
+	.halo-speed-card { width: 66px; height: 66px; }
+	.halo-speed-card strong { font-size: 27px; }
+	.halo-ride-memory-item { grid-template-columns: 38px minmax(0,1fr); }
+	.halo-ride-memory-item__icon { width: 38px; height: 38px; }
+	.halo-ride-memory-item__actions { grid-column: 1 / -1; justify-content: flex-end; }
+}
+
+@media (max-width: 389px) {
+	.halo-product-grid { grid-template-columns: 1fr; }
+	.halo-product-card { display: grid; grid-template-columns: 42% minmax(0, 1fr); }
+	.halo-product-image { aspect-ratio: auto; min-height: 150px; }
+	.halo-product-info h3 { min-height: 0; }
+}
+
+@media (max-width: 340px) {
+	.halo-topbar { padding-inline: max(12px, var(--halo-safe-left)) max(12px, var(--halo-safe-right)); }
+	.halo-brand-logo--topbar { width: 84px; }
+	.halo-status-pill { justify-content: center; width: 44px; padding-inline: 0; }
+	.halo-status-pill > span:last-child {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		white-space: nowrap;
+		border: 0;
+	}
+}
+
+@media (max-height: 620px) and (orientation: landscape) {
+	.halo-auth-header { margin-top: 0; }
+	.halo-auth-header .halo-brand-logo { width: 132px; margin-bottom: 18px; }
+	.halo-ride-guidance { right: auto; width: min(46vw, 620px); min-height: 76px; padding: 10px 13px; }
+	.halo-ride-guidance h1 { font-size: 18px; }
+	.halo-manoeuvre { font-size: 40px; }
+	.halo-ride-data-overlay { right: auto; bottom: calc(var(--halo-safe-bottom) + 10px); width: min(46vw, 620px); }
+	.halo-ride-performance > div { padding: 6px 4px; }
+	.halo-ride-hud > div { padding: 8px 5px; }
+	.halo-ride-controls { right: calc(var(--halo-safe-right) + 10px); left: auto; width: min(40vw, 560px); grid-template-columns: 56px 56px minmax(0,1fr); gap: 6px; }
+	.halo-ride-control,
+	.halo-hold-button { min-height: 52px; border-radius: 13px; }
+	.halo-speed-card { right: calc(var(--halo-safe-right) + 12px); bottom: calc(var(--halo-safe-bottom) + 76px); left: auto; width: 66px; height: 66px; }
+	.halo-speed-card strong { font-size: 27px; }
+	.halo-active-map-controls { top: calc(var(--halo-safe-top) + 12px); right: calc(var(--halo-safe-right) + 12px); bottom: auto; }
+	.halo-active-map .halo-map__attribution { top: calc(var(--halo-safe-top) + 12px); right: calc(var(--halo-safe-right) + 74px); }
+	.halo-ride-degraded { top: calc(var(--halo-safe-top) + 124px); }
+}
+
+@media (max-height: 620px) and (orientation: portrait) {
+	.halo-ride-guidance { grid-template-columns: 46px minmax(0,1fr); min-height: 78px; padding: 9px 13px; }
+	.halo-ride-guidance h1 { font-size: 20px; }
+	.halo-manoeuvre { font-size: 40px; }
+	.halo-ride-data-overlay { bottom: calc(var(--halo-safe-bottom) + 72px); }
+	.halo-ride-performance > div:nth-child(n+4) { display: none; }
+	.halo-ride-performance > div { padding: 6px 4px; }
+	.halo-ride-hud > div { padding: 8px 6px; }
+	.halo-ride-controls { bottom: calc(var(--halo-safe-bottom) + 8px); grid-template-columns: 62px 62px minmax(0, 1fr); gap: 7px; }
+	.halo-ride-control,
+	.halo-hold-button { min-height: 56px; border-radius: 14px; }
+	.halo-speed-card,
+	.halo-active-map-controls { bottom: calc(var(--halo-safe-bottom) + 176px); }
+	.halo-active-map .halo-map__attribution,
+	.halo-active-map .halo-map__status,
+	.halo-ride-degraded { top: calc(var(--halo-safe-top) + 122px); }
+	html.halo-ride-active .halo-toast-region { top: calc(var(--halo-safe-top) + 124px); }
+}
+
+/* Keep the incident controls reachable above compact iPhone landscape bars. */
+@media (max-height: 500px) and (orientation: landscape) {
+	.halo-crash-state { padding: calc(8px + var(--halo-safe-top)) calc(12px + var(--halo-safe-right)) calc(8px + var(--halo-safe-bottom)) calc(12px + var(--halo-safe-left)); }
+	.halo-crash-panel { width: min(100%, 520px); }
+	.halo-crash-panel > .halo-icon { width: 30px; height: 30px; margin-bottom: 4px; }
+	.halo-crash-panel .halo-eyebrow { margin-bottom: 2px; font-size: 9px; }
+	.halo-crash-panel h1 { margin-bottom: 4px; font-size: 27px; }
+	.halo-crash-panel > p:not(.halo-eyebrow) { max-width: 480px; margin-bottom: 6px; font-size: 12px; line-height: 1.3; }
+	.halo-crash-countdown { width: 62px; height: 62px; margin: 4px 0 8px; font-size: 27px; }
+	.halo-crash-panel .halo-button,
+	.halo-crash-panel .halo-text-button { min-height: 44px; }
+	.halo-crash-panel small { margin-top: 5px; font-size: 9px; line-height: 1.25; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.halo-app *,
+	.halo-app *::before,
+	.halo-app *::after {
+		scroll-behavior: auto !important;
+		animation-duration: 1ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 1ms !important;
+	}
+	.halo-hold-button.is-holding > span { transition-duration: 2s !important; }
+}
+
+@media (prefers-contrast: more) {
+	:root { --halo-line: rgba(18,22,25,.25); --halo-line-strong: rgba(18,22,25,.42); }
+	.halo-app { --halo-ink-soft: #3f4448; --halo-ink-faint: #60656a; }
+}
+
+@media print {
+	.halo-topbar,
+	.halo-bottom-nav,
+	.halo-system-banner,
+	.halo-guardian-sharing,
+	.halo-toast-region { display: none !important; }
+	.halo-main { padding: 0; }
+	.halo-view { padding: 20px; }
+}

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Avenrà Halo</title>
+  <desc id="desc">Graphite Halo app icon with an electric blue ring and white H monogram.</desc>
+  <defs>
+    <radialGradient id="surface" cx="30%" cy="18%" r="92%">
+      <stop offset="0" stop-color="#25303c"/>
+      <stop offset="0.55" stop-color="#11171e"/>
+      <stop offset="1" stop-color="#080b0f"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="72" y1="68" x2="438" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#70c7ff"/>
+      <stop offset="0.45" stop-color="#1683ff"/>
+      <stop offset="1" stop-color="#0062d6"/>
+    </linearGradient>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="11" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#surface)"/>
+  <circle cx="256" cy="256" r="171" fill="none" stroke="#1683ff" stroke-opacity=".19" stroke-width="38" filter="url(#glow)"/>
+  <circle cx="256" cy="256" r="171" fill="none" stroke="url(#ring)" stroke-width="18"/>
+  <path d="M169 151h42v84h90v-84h42v210h-42v-86h-90v86h-42z" fill="#fff"/>
+  <circle cx="369" cy="151" r="8" fill="#70c7ff"/>
+</svg>

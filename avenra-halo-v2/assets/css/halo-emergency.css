@@ -1,0 +1,193 @@
+:root {
+	color-scheme: light;
+	--ink: #101214;
+	--muted: #687078;
+	--line: #dfe3e5;
+	--paper: #f5f6f3;
+	--card: #ffffff;
+	--red: #bd1e2c;
+	--red-dark: #7f111b;
+	--green: #176b4c;
+	--blue: #1769aa;
+	font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { background: var(--paper); }
+
+.halo-assist-body {
+	margin: 0;
+	min-height: 100vh;
+	background:
+		radial-gradient(circle at 100% 0, rgba(189, 30, 44, .09), transparent 28rem),
+		linear-gradient(180deg, #fbfcfa 0, var(--paper) 34rem);
+	color: var(--ink);
+	-webkit-font-smoothing: antialiased;
+}
+
+.halo-assist-shell {
+	width: min(1120px, 100%);
+	margin: 0 auto;
+	padding: max(20px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(48px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+
+.halo-assist-brand {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	min-width: 0;
+	min-height: 62px;
+	margin-bottom: 26px;
+	border-bottom: 1px solid var(--line);
+}
+
+.halo-assist-brand img { display: block; flex: 0 0 auto; width: 150px; height: auto; object-fit: contain; }
+.halo-assist-brand > span { border-left: 1px solid #c7cccf; padding-left: 18px; color: #555d63; font-size: 11px; font-weight: 800; letter-spacing: .13em; line-height: 1.35; white-space: nowrap; }
+
+.halo-assist-hero {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 24px;
+	padding: 12px 0 24px;
+}
+
+h1, h2, p { margin-top: 0; }
+h1 { margin-bottom: 8px; font-size: clamp(32px, 7vw, 58px); line-height: .98; letter-spacing: -.045em; }
+h2 { margin-bottom: 12px; font-size: clamp(21px, 3vw, 30px); line-height: 1.08; letter-spacing: -.025em; }
+p { line-height: 1.55; }
+
+.halo-assist-kicker { margin-bottom: 8px; color: var(--red); font-size: 11px; font-weight: 850; letter-spacing: .17em; }
+.halo-assist-muted { color: var(--muted); }
+
+.halo-assist-status {
+	flex: 0 0 auto;
+	padding: 9px 13px;
+	border: 1px solid #e5b9bd;
+	border-radius: 999px;
+	background: #fff2f3;
+	color: var(--red-dark);
+	font-size: 12px;
+	font-weight: 800;
+}
+.halo-assist-status--resolved, .halo-assist-status--false_alarm { border-color: #b6d8ca; background: #edf8f3; color: var(--green); }
+.halo-assist-status--acknowledged { border-color: #b8d2e7; background: #eff7fc; color: var(--blue); }
+
+.halo-assist-alert {
+	margin: 0 0 18px;
+	padding: 16px 18px;
+	border: 1px solid #d9dde0;
+	border-radius: 18px;
+	background: rgba(255,255,255,.86);
+	line-height: 1.48;
+}
+.halo-assist-alert--critical { border-color: #dca0a7; background: #8e1722; color: #fff; box-shadow: 0 16px 34px rgba(127,17,27,.17); }
+.halo-assist-alert--success { border-color: #acd4c4; background: #edf8f3; color: #12563d; }
+.halo-assist-alert--error { border-color: #e6b8bc; background: #fff1f2; color: #861824; }
+
+.halo-assist-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.halo-assist-grid--top { margin-top: 18px; }
+
+.halo-assist-card {
+	margin-bottom: 18px;
+	padding: clamp(20px, 4vw, 30px);
+	border: 1px solid rgba(204, 210, 213, .82);
+	border-radius: 26px;
+	background: rgba(255, 255, 255, .94);
+	box-shadow: 0 18px 50px rgba(20, 26, 30, .07);
+}
+.halo-assist-grid .halo-assist-card { margin-bottom: 0; }
+.halo-assist-card--action { border-color: #b9c7d0; background: linear-gradient(145deg, #fff, #f4f8fa); }
+.halo-assist-card--medical { border-color: #c7bbd8; background: linear-gradient(145deg, #fff, #f8f5fb); }
+.halo-assist-card--script { border-color: #d6c1c4; background: linear-gradient(145deg, #fff, #fff7f7); }
+.halo-assist-card--script blockquote { margin: 14px 0; padding: 0 0 0 18px; border-left: 4px solid var(--red); font-size: clamp(17px, 2.3vw, 22px); font-weight: 680; line-height: 1.48; }
+.halo-assist-impact-location { margin-top: 18px; padding: 16px 18px; border: 1px solid #d9dde0; border-radius: 16px; background: #fafbfa; }
+.halo-assist-impact-location p:last-child { margin-bottom: 0; }
+
+.halo-assist-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.halo-assist-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 18px 0 0; }
+.halo-assist-facts--wide { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.halo-assist-facts div { min-width: 0; padding: 13px 14px; border-radius: 15px; background: #f4f5f3; }
+.halo-assist-facts dt { margin-bottom: 5px; color: var(--muted); font-size: 11px; font-weight: 750; text-transform: uppercase; letter-spacing: .08em; }
+.halo-assist-facts dd { margin: 0; overflow-wrap: anywhere; font-size: 15px; font-weight: 760; }
+
+.halo-assist-hv-warning { margin: 18px 0 0; padding: 14px; border-left: 4px solid var(--red); border-radius: 8px 14px 14px 8px; background: #fff0f1; color: #6d121b; font-size: 14px; font-weight: 650; }
+.halo-assist-medical-notes { margin: 18px 0 0; padding: 16px; border-radius: 16px; background: #f4f0f8; }
+
+.halo-assist-button {
+	display: inline-flex;
+	min-height: 48px;
+	align-items: center;
+	justify-content: center;
+	padding: 12px 17px;
+	border: 0;
+	border-radius: 14px;
+	font: inherit;
+	font-size: 14px;
+	font-weight: 800;
+	text-align: center;
+	text-decoration: none;
+	cursor: pointer;
+}
+.halo-assist-button--dark { background: var(--ink); color: #fff; }
+.halo-assist-button--light { border: 1px solid #d6dbde; background: #fff; color: var(--ink); }
+.halo-assist-button--call { margin-top: 10px; background: #eaf5f0; color: var(--green); }
+.halo-assist-button--danger { background: var(--red); color: #fff; }
+.halo-assist-button:disabled { opacity: .42; cursor: not-allowed; }
+.halo-assist-button:focus-visible, input:focus-visible, a:focus-visible { outline: 3px solid rgba(23,105,170,.36); outline-offset: 3px; }
+
+form label { display: block; margin-bottom: 14px; }
+form label span { display: block; margin-bottom: 7px; font-size: 13px; font-weight: 750; }
+input[type="text"] { width: 100%; min-height: 52px; padding: 12px 14px; border: 1px solid #cbd1d4; border-radius: 14px; background: #fff; color: var(--ink); font: inherit; }
+
+.halo-assist-action-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.halo-assist-action-grid form, .halo-assist-action-grid button { width: 100%; height: 100%; }
+
+.halo-assist-route { margin-top: 20px; }
+.halo-assist-route svg { display: block; width: 100%; height: auto; border-radius: 18px; background: #111619; }
+.halo-assist-route-grid { fill: none; stroke: #263137; stroke-width: 1; }
+.halo-assist-route polyline { fill: none; stroke: #f2f5f6; stroke-linecap: round; stroke-linejoin: round; stroke-width: 4; }
+.halo-assist-route circle { fill: #ef4654; stroke: #fff; stroke-width: 3; }
+.halo-assist-route small { display: block; margin-top: 8px; color: var(--muted); line-height: 1.45; }
+
+.halo-assist-table-wrap { overflow-x: auto; }
+.halo-assist-media { border-color: #b9c7d0; background: linear-gradient(145deg, #fff, #f4f8fa); }
+.halo-assist-media-status { margin: 14px 0 0; padding: 12px 14px; border-radius: 14px; color: #34424c; background: #eaf1f5; font-size: 13px; font-weight: 700; }
+.halo-assist-media-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.halo-assist-media-grid:empty { display: none; }
+.halo-assist-media-clip { display: grid; gap: 10px; min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 18px; background: #f7f8f7; }
+.halo-assist-media-clip h3 { margin: 0; font-size: 16px; }
+.halo-assist-media-clip video { display: block; width: 100%; max-height: 330px; border-radius: 12px; background: #0c1013; }
+.halo-assist-media-clip small { color: var(--muted); font-weight: 700; }
+.halo-assist-media-clip .halo-assist-button { width: 100%; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+
+.halo-assist-timeline ol { margin: 22px 0 0; padding: 0; list-style: none; }
+.halo-assist-timeline li { display: grid; grid-template-columns: 12px 1fr; gap: 13px; padding-bottom: 17px; }
+.halo-assist-timeline li > span { width: 10px; height: 10px; margin-top: 5px; border: 2px solid #fff; border-radius: 50%; background: var(--blue); box-shadow: 0 0 0 2px #a9c8df; }
+.halo-assist-timeline strong, .halo-assist-timeline small { display: block; }
+.halo-assist-timeline small { margin-top: 4px; color: var(--muted); line-height: 1.4; }
+
+.halo-assist-centre { width: min(620px, 100%); margin: 12vh auto 0; padding: clamp(28px, 7vw, 54px); border: 1px solid var(--line); border-radius: 30px; background: rgba(255,255,255,.95); box-shadow: 0 30px 80px rgba(20,26,30,.10); text-align: center; }
+.halo-assist-spinner { width: 42px; height: 42px; margin: 0 auto 22px; border: 3px solid #d9dfe2; border-top-color: var(--ink); border-radius: 50%; animation: halo-assist-spin .85s linear infinite; }
+@keyframes halo-assist-spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 760px) {
+	.halo-assist-brand { gap: 12px; }
+	.halo-assist-brand img { width: 120px; }
+	.halo-assist-brand > span { padding-left: 12px; font-size: 9px; }
+	.halo-assist-hero, .halo-assist-card-heading { display: block; }
+	.halo-assist-status { display: inline-flex; margin-top: 14px; }
+	.halo-assist-grid { grid-template-columns: 1fr; }
+	.halo-assist-facts--wide { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+	.halo-assist-card-heading .halo-assist-button { width: 100%; margin-top: 12px; }
+	.halo-assist-action-grid { grid-template-columns: 1fr; }
+	.halo-assist-media-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.halo-assist-spinner { animation: none; }
+}

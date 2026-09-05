@@ -110,6 +110,9 @@ Halo Community is disabled until a rider explicitly joins. Its public identity i
 * Crash detection now measures gravity-removed g on every device, discards an impact when the rider keeps riding, and waits 60 seconds after a rider cancels before it can ask again.
 * Fixed the next-of-kin "Send test alert" button, and next-of-kin crash notifications, failing with "temporarily unavailable" on sites without the V1 theme handlers. Halo now sends these messages itself through the configured FireText key or SMS delivery filter and only falls back to the V1 bridge when it cannot send SMS.
 * Reported a missing next-of-kin alert provider as a configuration error instead of a temporary outage.
+* Made the lean baseline self-correct when a phone is re-seated mid-ride, without ever adopting a tipped-over bike as upright, and removed an unused engine event binding that could have opened the crash screen without confirmation.
+* Raised the per-account candidate-incident limit so a genuine crash cannot be refused its server-side deadline after a run of earlier alerts.
+* PIN recovery and boutique checkout now report a missing V1 handler or integration as a configuration problem with clear guidance, instead of asking the rider to retry a temporary outage.
 
 = 2.7.1 =
 * Added a polished `?install=1` website hand-off that opens Halo's own installer and keeps the browser installation prompt behind an explicit rider tap.

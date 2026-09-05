@@ -38,6 +38,8 @@ Detection runs on the phone inside Ride mode and never from a single sensor read
    - the phone stays tipped past 55° from its ride baseline for two seconds while the bike is stopped or GPS is lost; or
    - the impact was severe (8 g or more) and the bike then stops, or no GPS fix at all arrives during the window.
 
+Lean is measured against the mount angle captured while the bike was stationary at the start of the ride. If the phone is re-seated mid-ride, the engine re-baselines from the average lean at road speed once a persistent offset of 6° to 35° is seen over about 30 seconds; larger offsets are treated as a possible tip-over and are never adopted, and no correction runs while an impact is being assessed.
+
 An impact is discarded quietly when the rider is still travelling at 12 mph or more four seconds later, when the stop was a gradual one, or when the window lapses with no confirmation. After a rider cancels a countdown, detection stays suppressed for 60 seconds so the same rough stretch cannot ask again straight away. The incident record carries the impact speed, peak dynamic g, the number of samples that formed the impact and the confirmation rule that fired.
 
 ## Live sequence

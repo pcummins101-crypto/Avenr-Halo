@@ -198,6 +198,11 @@
                 crashSpeedFreshnessMs: 8000,
                 crashRiderCancelCooldownMs: 60000,
                 crashCountdownSeconds: 20,
+                /* Lean baseline self-correction (see correctOrientationBaseline). */
+                leanBaselineMinSpeedMph: 15,
+                leanBaselineSamples: 300,
+                leanBaselineMinCorrectionDegrees: 6,
+                leanBaselineMaxCorrectionDegrees: 35,
                 maxTrackPoints: 12000,
                 persistEveryPoints: 8,
                 telemetryIntervalMs: 100,
@@ -232,6 +237,8 @@
             this.maxLeanRight = 0;
             this.lean = 0;
             this.orientationBaseline = null;
+            this.orientationDrift = null;
+            this.orientationDriftSamples = 0;
             this.orientationSnapshot = null;
             this.lastOrientationAt = 0;
             this.lastAcceleration = null;
@@ -575,11 +582,41 @@
             if (!Number.isFinite(raw)) return;
             this.orientationSamples += 1;
             if (this.orientationBaseline === null && this.currentSpeed < 3) this.orientationBaseline = raw;
+            this.correctOrientationBaseline(raw);
             const lean = clamp(raw - (this.orientationBaseline || 0), -65, 65);
             this.lean = lean;
             if (lean < 0) this.maxLeanLeft = Math.max(this.maxLeanLeft, Math.abs(lean));
             if (lean > 0) this.maxLeanRight = Math.max(this.maxLeanRight, lean);
         };
+
+        /* The mount angle is captured once while stationary. If the phone is
+         * re-seated mid-ride every lean reading, and the tip-over rule, would be
+         * offset for the rest of the ride. While the bike is travelling at road
+         * speed its lean averages to upright over time, so a persistent offset in
+         * that average is treated as a new mount angle. Correction is never
+         * applied while an impact is being assessed or a countdown is running, so
+         * a bike lying on its side cannot re-baseline itself. */
+        correctOrientationBaseline(raw) {
+            if (this.orientationBaseline === null) return false;
+            if (this.pendingImpact || this.crashPhase !== 'idle') {
+                this.orientationDrift = null;
+                this.orientationDriftSamples = 0;
+                return false;
+            }
+            if (!this.speedIsFresh() || this.currentSpeed < this.options.leanBaselineMinSpeedMph) return false;
+            const offset = raw - this.orientationBaseline;
+            if (Math.abs(offset) > this.options.leanBaselineMaxCorrectionDegrees) return false;
+            this.orientationDrift = this.orientationDrift === null ? offset : this.orientationDrift + (offset - this.orientationDrift) / this.options.leanBaselineSamples;
+            this.orientationDriftSamples += 1;
+            if (this.orientationDriftSamples < this.options.leanBaselineSamples) return false;
+            this.orientationDriftSamples = 0;
+            const drift = this.orientationDrift;
+            this.orientationDrift = null;
+            if (Math.abs(drift) < this.options.leanBaselineMinCorrectionDegrees) return false;
+            this.orientationBaseline += drift;
+            this.emit('leanbaseline', { baseline: rounded(this.orientationBaseline, 1), correctionDegrees: rounded(drift, 1) });
+            return true;
+        }
 
         startGps() {
             if (!navigator.geolocation) throw new Error('Location is not supported on this device.');

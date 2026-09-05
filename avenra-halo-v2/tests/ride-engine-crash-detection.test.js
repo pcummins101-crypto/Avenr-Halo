@@ -37,6 +37,7 @@ function loadRideEngine(clock) {
 		window,
 		document,
 		navigator: { onLine: true },
+		performance: { now: () => clock.now },
 		EventTarget,
 		CustomEvent,
 		Date: FakeDate,
@@ -287,4 +288,62 @@ test('detection thresholds are no longer a single 2.5 g reading', () => {
 	assert.match(source, /crashImpactMinSamples:\s*3/);
 	assert.match(source, /crashStopConfirmFixes:\s*2/);
 	assert.match(source, /crashRiderCancelCooldownMs:\s*60000/);
+});
+
+function orientationSample(engine, clock, at, gamma) {
+	clock.now = at;
+	engine.handleOrientation({ alpha: 0, beta: 0, gamma, absolute: false });
+}
+
+test('a re-seated phone re-baselines lean from the road-speed average', () => {
+	const clock = { now: START };
+	const { engine } = ridingEngine(clock);
+	orientationSample(engine, clock, START, 0);
+	assert.equal(engine.orientationBaseline, 0);
+
+	// The phone is knocked 12 degrees in its mount; the rider carries on at 30 mph.
+	let at = START + 1000;
+	for (let index = 0; index < 320; index += 1) {
+		if (index % 40 === 0) gpsFix(engine, clock, at, THIRTY_MPH, index * 0.00001);
+		orientationSample(engine, clock, at, 12 + (index % 2 ? 1 : -1));
+		at += 100;
+	}
+	assert.ok(Math.abs(engine.orientationBaseline - 12) < 1, `baseline ${engine.orientationBaseline}`);
+	assert.ok(Math.abs(engine.lean) < 2, `lean ${engine.lean}`);
+});
+
+test('a bike lying on its side is never adopted as the new upright', () => {
+	const clock = { now: START };
+	const { engine } = ridingEngine(clock);
+	orientationSample(engine, clock, START, 0);
+	let at = START + 1000;
+	for (let index = 0; index < 320; index += 1) {
+		if (index % 40 === 0) gpsFix(engine, clock, at, THIRTY_MPH, index * 0.00001);
+		orientationSample(engine, clock, at, 80);
+		at += 100;
+	}
+	assert.equal(engine.orientationBaseline, 0, 'a large offset is a tip-over, not a re-seat');
+	assert.equal(engine.lean, 65);
+});
+
+test('lean is not re-baselined while an impact is being assessed', () => {
+	const clock = { now: START };
+	const { engine } = ridingEngine(clock);
+	orientationSample(engine, clock, START, 0);
+	gpsFix(engine, clock, START + 500, THIRTY_MPH);
+	impactBurst(engine, clock, START + 1000, 5);
+	assert.ok(engine.pendingImpact);
+	let at = START + 1200;
+	for (let index = 0; index < 320; index += 1) {
+		if (index % 40 === 0) gpsFix(engine, clock, at, THIRTY_MPH, index * 0.00001);
+		orientationSample(engine, clock, at, 20);
+		at += 100;
+	}
+	assert.equal(engine.orientationBaseline, 0);
+});
+
+test('the app has no unconfirmed engine event that opens the crash screen', () => {
+	const appSource = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+	assert.doesNotMatch(appSource, /^\s*impact:\s*\(payload\)\s*=>\s*this\.app\.showCrashState/m);
+	assert.match(appSource, /crashcandidate:\s*\(payload\)\s*=>\s*this\.app\.showCrashState/);
 });

@@ -694,7 +694,6 @@
 				crashcountdown: (payload) => this.app.updateCrashCountdown(payload),
 				crashcancelled: (payload) => this.app.handleEngineCrashCancelled(payload),
 				crash: (payload) => this.app.confirmCrash(payload),
-				impact: (payload) => this.app.showCrashState(Object.assign({}, payload, { engine_managed: true })),
 				error: (payload) => this.app.handleRideError(payload),
 				ended: (payload) => this.app.onRideEngineEnded(payload)
 			};

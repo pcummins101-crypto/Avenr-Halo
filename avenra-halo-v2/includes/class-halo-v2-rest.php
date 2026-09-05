@@ -643,7 +643,9 @@ final class Avenra_Halo_V2_REST {
 		}
 		$provider_configured = has_filter( 'avenra_halo_v2_recovery_request' ) || has_action( 'wp_ajax_nopriv_reset_avenra_pin' ) || has_action( 'wp_ajax_reset_avenra_pin' );
 		if ( ! $provider_configured ) {
-			return Avenra_Halo_V2_Response::error( 'recovery_service_unavailable', __( 'PIN recovery is temporarily unavailable. Please contact Avenrà support.', 'avenra-halo-v2' ), 503 );
+			// Neither the recovery filter nor the V1 handler exists: this is a
+			// configuration gap, not an outage, and support needs to know that.
+			return Avenra_Halo_V2_Response::error( 'recovery_service_not_configured', __( 'Self-service PIN recovery is not set up on this site. Please contact Avenrà support, who can reset your PIN for you.', 'avenra-halo-v2' ), 503, array( 'retryable' => false ) );
 		}
 
 		$account_allowed = $this->consume_rate_limit( 'recover-account', $email, 4, HOUR_IN_SECONDS );
@@ -1171,7 +1173,10 @@ final class Avenra_Halo_V2_REST {
 		if ( ! is_string( $encoded ) || strlen( $encoded ) > 128 * KB_IN_BYTES ) {
 			return Avenra_Halo_V2_Response::error( 'incident_payload_too_large', __( 'The Emergency Assist incident contained too much telemetry.', 'avenra-halo-v2' ), 413 );
 		}
-		if ( ! $this->consume_rate_limit( 'incident-candidate-account', (string) $customer_id, 20, HOUR_IN_SECONDS ) ) {
+		// Generous by design: a refused candidate would leave a genuine crash
+		// without its server-side deadline. Abuse is bounded separately by the
+		// activation limit on /safety/crash-alert.
+		if ( ! $this->consume_rate_limit( 'incident-candidate-account', (string) $customer_id, 60, HOUR_IN_SECONDS ) ) {
 			return Avenra_Halo_V2_Response::error( 'incident_throttled', __( 'Halo could not record another possible incident yet.', 'avenra-halo-v2' ), 429, array( 'retry_after' => HOUR_IN_SECONDS ) );
 		}
 		$result = $emergency->record_candidate( $customer_id, $event_id, $body, 'automatic' );
@@ -2936,7 +2941,7 @@ final class Avenra_Halo_V2_REST {
 			}
 		}
 
-		return Avenra_Halo_V2_Response::error( 'checkout_unavailable', __( 'Secure checkout is temporarily unavailable. Your basket has been kept.', 'avenra-halo-v2' ), 503 );
+		return $this->checkout_unavailable_error( $legacy, __( 'Secure checkout is temporarily unavailable. Your basket has been kept.', 'avenra-halo-v2' ) );
 	}
 
 	public function manual( WP_REST_Request $request ): WP_REST_Response {
@@ -3019,7 +3024,21 @@ final class Avenra_Halo_V2_REST {
 			}
 		}
 
-		return Avenra_Halo_V2_Response::error( 'checkout_unavailable', __( 'Secure checkout is temporarily unavailable.', 'avenra-halo-v2' ), 503 );
+		return $this->checkout_unavailable_error( $legacy, __( 'Secure checkout is temporarily unavailable.', 'avenra-halo-v2' ) );
+	}
+
+	/**
+	 * Distinguish a checkout that is not connected at all (no WooCommerce
+	 * product mapping, no checkout filter and no V1 handler) from a transient
+	 * failure, so the rider is not told to retry something that cannot work.
+	 *
+	 * @param array<string,mixed>|WP_Error $legacy
+	 */
+	private function checkout_unavailable_error( array|WP_Error $legacy, string $transient_message ): WP_REST_Response {
+		if ( is_wp_error( $legacy ) && in_array( $legacy->get_error_code(), array( 'legacy_action_missing', 'legacy_action_not_allowed', 'legacy_action_disabled' ), true ) ) {
+			return Avenra_Halo_V2_Response::error( 'checkout_not_configured', __( 'Online checkout is not connected on this site yet. Please contact Avenrà to complete your order.', 'avenra-halo-v2' ), 503, array( 'retryable' => false ) );
+		}
+		return Avenra_Halo_V2_Response::error( 'checkout_unavailable', $transient_message, 503, array( 'retryable' => true ) );
 	}
 
 	public function welcome_pack( WP_REST_Request $request ): WP_REST_Response {

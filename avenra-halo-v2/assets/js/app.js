@@ -3098,6 +3098,7 @@
 				case 'transport-missing': return 'The device you chose does not provide BMS data. Pair again and choose the HyperCore BMS module.';
 				case 'connect-failed': return 'The BMS did not answer the Bluetooth connection. Move the phone next to the motorcycle, close any other app connected to the BMS, then try again.';
 				case 'notifications-failed': return 'The BMS link opened but its data stream did not start. Switch the motorcycle off and on again, then pair again.';
+				case 'probe-write-failed': return 'The BMS link opened but it refused Halo’s read request. Switch the motorcycle off and on again, close any other app connected to the BMS, then pair again.';
 				default: return 'Halo could not open the BMS data link. Check that Bluetooth and the motorcycle are switched on, then try again.';
 			}
 		}
@@ -3110,6 +3111,20 @@
 			}
 		}
 
+		/* A short technical line under a failed or silent link so a rider can
+		 * report exactly what happened without reading browser consoles. */
+		hypercoreDetailsMarkup(link) {
+			const status = String(link?.status || '');
+			if (!['error', 'stale', 'disconnected'].includes(status)) return '';
+			const parts = [];
+			if (link?.lastError) parts.push(String(link.lastError));
+			else if (status === 'stale' && link?.reason === 'no-telemetry') parts.push('No reply to the read requests.');
+			if (link?.transport) parts.push(`Channel ${String(link.transport)}`);
+			if (link?.reason && !['connection-failed', 'user-request'].includes(String(link.reason))) parts.push(`Code ${String(link.reason)}`);
+			if (!parts.length) return '';
+			return `<p class="halo-helper halo-hypercore-details">Details: ${escapeHTML(parts.join(' · '))}</p>`;
+		}
+
 		bmsPresentation() {
 			const bms = this.state.bms || {};
 			const status = text(bms.status, bms.supported ? 'idle' : 'unavailable');
@@ -3117,6 +3132,7 @@
 			if (status === 'scanning') return { title: 'HyperCore BMS', badge: 'Scanning', badgeClass: '', copy: 'Choose the HyperCore BMS in your phone’s Bluetooth window. Every nearby Bluetooth device is listed: pick the battery module, not the ECU.' };
 			if (status === 'connecting') return { title: 'HyperCore BMS', badge: 'Connecting', badgeClass: '', copy: 'Halo is opening the BMS data link.' };
 			if (status === 'waiting-for-data') return { title: 'HyperCore BMS', badge: 'Connected', badgeClass: '', copy: 'The link is open. Halo will mark the BMS live after its first valid update.' };
+			if (status === 'stale' && (bms.reason === 'no-telemetry' || !bms.telemetry)) return { title: 'HyperCore BMS', badge: 'No data', badgeClass: 'halo-badge--attention', copy: 'The BMS link is open but the BMS has not answered Halo’s read requests. If another app on this or another phone is connected to the BMS, close it, then disconnect and pair again.' };
 			if (status === 'stale') return { title: 'HyperCore BMS', badge: 'Delayed', badgeClass: 'halo-badge--attention', copy: 'The BMS signal is delayed. Values below are the last reading, not current data.' };
 			if (status === 'error') return { title: 'HyperCore BMS', badge: 'Check', badgeClass: 'halo-badge--attention', copy: this.bmsErrorCopy(bms.reason) };
 			if (status === 'unavailable') return { title: 'HyperCore BMS', badge: 'Unavailable', badgeClass: 'halo-badge--attention', copy: bms.reason === 'insecure-context' ? 'For security, BMS pairing requires Halo to be opened over HTTPS.' : 'This phone or app build does not expose the Bluetooth data access required by HyperCore BMS. You can still enter starting charge manually before a ride.' };
@@ -3164,7 +3180,7 @@
 				? '<button type="button" class="halo-button halo-button--secondary halo-full-width" data-action="disconnect-ecu">Disconnect HyperCore ECU</button>'
 				: supported && hasDeliveredVehicle ? `<button type="button" class="halo-button halo-button--primary halo-full-width" data-action="connect-ecu" ${canPair && !busy ? '' : 'disabled'}>${this.state.activeRide || this.rideStarting ? 'Pair after this ride' : busy ? 'Connecting…' : ecu.status === 'error' || ecu.status === 'disconnected' ? 'Pair HyperCore ECU again' : 'Connect HyperCore ECU'}</button>` : '';
 			return `<div class="halo-card-header"><div><p class="halo-card-kicker">DRIVE SYSTEM</p><h2>${escapeHTML(presentation.title)}</h2></div><span class="halo-badge ${presentation.badgeClass}">${escapeHTML(presentation.badge)}</span></div>
-				<p class="halo-card-copy">${escapeHTML(presentation.copy)}</p>${metrics}${action ? `<div class="halo-button-stack halo-hypercore-actions">${action}</div>` : ''}
+				<p class="halo-card-copy">${escapeHTML(presentation.copy)}</p>${this.hypercoreDetailsMarkup(ecu)}${metrics}${action ? `<div class="halo-button-stack halo-hypercore-actions">${action}</div>` : ''}
 				<p class="halo-helper halo-hypercore-safety">Connect only while safely parked. Halo reads ECU diagnostics and cannot change powertrain settings. ECU speed is shown as a diagnostic and never replaces GPS ride speed.</p>`;
 		}
 
@@ -3190,7 +3206,7 @@
 				? '<button type="button" class="halo-button halo-button--secondary halo-full-width" data-action="disconnect-bms">Disconnect HyperCore BMS</button>'
 				: supported && hasDeliveredVehicle ? `<button type="button" class="halo-button halo-button--primary halo-full-width" data-action="connect-bms" ${canPair && !busy ? '' : 'disabled'}>${this.state.activeRide || this.rideStarting ? 'Pair after this ride' : busy ? 'Connecting…' : bms.status === 'error' || bms.status === 'disconnected' ? 'Pair HyperCore BMS again' : 'Connect HyperCore BMS'}</button>` : '';
 			return `<div class="halo-card-header"><div><p class="halo-card-kicker">ENERGY SYSTEM</p><h2>${escapeHTML(presentation.title)}</h2></div><span class="halo-badge ${presentation.badgeClass}">${escapeHTML(presentation.badge)}</span></div>
-				<p class="halo-card-copy">${escapeHTML(presentation.copy)}</p>${metrics}${action ? `<div class="halo-button-stack halo-hypercore-actions halo-bms-actions">${action}</div>` : ''}
+				<p class="halo-card-copy">${escapeHTML(presentation.copy)}</p>${this.hypercoreDetailsMarkup(bms)}${metrics}${action ? `<div class="halo-button-stack halo-hypercore-actions halo-bms-actions">${action}</div>` : ''}
 				<p class="halo-helper halo-hypercore-safety halo-bms-safety">Connect only while safely parked. Halo reads BMS information and cannot change BMS settings or other powertrain settings. Charge may be included with a ride or Emergency Assist alert.</p>`;
 		}
 

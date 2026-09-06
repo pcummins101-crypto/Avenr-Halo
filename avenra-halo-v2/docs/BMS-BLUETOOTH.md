@@ -29,6 +29,24 @@ picked in the ECU chooser is reported the other way round. A link that never
 opened, and a link that opened without a data stream, each carry their own
 instruction instead of one generic message.
 
+## Troubleshooting a BMS that will not pair
+
+- **Another app holds the link.** A BMS module accepts one connection at a
+  time. A vendor or diagnostic app left running with auto-reconnect, on this
+  phone or another, keeps the module busy and Halo's connection times out or is
+  refused. Close that app fully, then pair again.
+- **First operation fails right after connecting.** Android Bluetooth
+  frequently fails the first GATT operation after a fresh connection. Halo now
+  retries the connection, the notification start and the first read request
+  once each, half a second apart, before reporting a failure.
+- **The card says "No data".** The link opened and the read requests were
+  written, but the module never answered. Switch the motorcycle off and on,
+  make sure no other app is connected, then disconnect and pair again.
+- **Details line.** A failed or silent link shows a short technical line under
+  the card copy: the error, the channel used (`ffe0`, `ff00`, `fff0` or
+  `auto`) and a short code. Riders can quote this line when reporting a
+  problem.
+
 Ride start is disabled only while a chooser or connection is actively opening.
 Live, partial, delayed and unavailable telemetry never end an active ride. Halo
 disconnects both sessions when the page is hidden or unloaded, the rider signs

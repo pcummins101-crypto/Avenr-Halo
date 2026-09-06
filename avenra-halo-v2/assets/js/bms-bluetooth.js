@@ -344,7 +344,8 @@
 				autoDiscover: true,
 				wakeDelayMs: 200,
 				legacyProbeDelayMs: 50,
-				connectTimeoutMs: 10000,
+				connectTimeoutMs: 15000,
+				retryDelayMs: 500,
 				discoveryTimeoutMs: 5000,
 				notificationTimeoutMs: 5000,
 				pingIntervalMs: 2000,
@@ -494,11 +495,7 @@
 				this.device = device;
 				device.addEventListener?.('gattserverdisconnected', this.boundDisconnected);
 				this._setStatus('connecting', { reason: 'device-selected' });
-				const serverRequest = Promise.resolve(device.gatt.connect());
-				serverRequest.then(() => {
-					if (!this._isCurrent(generation) || this.device !== device) this._disconnectDevice(device);
-				}, () => {});
-				const server = await this._awaitOperation(serverRequest, this.options.connectTimeoutMs, 'The Bluetooth connection timed out.', 'connect-failed');
+				const server = await this._connectGatt(device, generation);
 				if (!this._isCurrent(generation)) {
 					this._disconnectDevice(device);
 					return this.getStatus();
@@ -513,12 +510,7 @@
 				// the shared FFE1 transport. Notifications always come from this channel.
 				this.characteristic = discovered.notifyCharacteristic;
 				this.notifyCharacteristic.addEventListener?.('characteristicvaluechanged', this.boundValueChanged);
-				await this._awaitOperation(
-					Promise.resolve(this.notifyCharacteristic.startNotifications()),
-					this.options.notificationTimeoutMs,
-					'The BMS notification stream did not start in time.',
-					'notifications-failed'
-				);
+				await this._startNotifications(this.notifyCharacteristic, generation);
 				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
 				// Some BMS units notify as soon as notifications start. Do not
 				// overwrite an already-valid live reading with a waiting state.
@@ -526,7 +518,7 @@
 				this._armStaleTimer(generation);
 				await this.options.sleep(this.options.wakeDelayMs);
 				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
-				await this._sendProbeCycle(generation);
+				await this._retryOnce(() => this._sendProbeCycle(generation), generation, 'probe-write-failed');
 				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
 				this._startPingTimer(generation);
 				return this.getStatus();
@@ -544,6 +536,48 @@
 					error: cancelled ? null : error
 				});
 			}
+		}
+
+		/* Serial Bluetooth modules on Android frequently fail the very first GATT
+		 * operation after a connection (status 133, "GATT operation failed for
+		 * unknown reason", a CCCD write that lands too early). One short retry
+		 * turns those into a working link instead of a failed pairing. A rider
+		 * cancellation or identity change is never retried. */
+		async _retryOnce(operation, generation, reason) {
+			try {
+				return await operation();
+			} catch (error) {
+				if (!this._isCurrent(generation) || (error && error.name === 'AbortError')) throw error;
+				await this.options.sleep(this.options.retryDelayMs);
+				if (!this._isCurrent(generation)) throw error;
+				try {
+					return await operation();
+				} catch (retryError) {
+					if (retryError && typeof retryError === 'object' && !retryError.haloReason && reason) {
+						try { retryError.haloReason = reason; } catch (assignError) { /* Frozen errors keep the generic reason. */ }
+					}
+					throw retryError;
+				}
+			}
+		}
+
+		_connectGatt(device, generation) {
+			return this._retryOnce(() => {
+				const serverRequest = Promise.resolve(device.gatt.connect());
+				serverRequest.then(() => {
+					if (!this._isCurrent(generation) || this.device !== device) this._disconnectDevice(device);
+				}, () => {});
+				return this._awaitOperation(serverRequest, this.options.connectTimeoutMs, 'The Bluetooth connection timed out.', 'connect-failed');
+			}, generation, 'connect-failed');
+		}
+
+		_startNotifications(characteristic, generation) {
+			return this._retryOnce(() => this._awaitOperation(
+				Promise.resolve(characteristic.startNotifications()),
+				this.options.notificationTimeoutMs,
+				'The BMS notification stream did not start in time.',
+				'notifications-failed'
+			), generation, 'notifications-failed');
 		}
 
 		_chooserRequest() {

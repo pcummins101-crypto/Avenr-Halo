@@ -92,3 +92,12 @@ test('the BMS transport is read-only apart from its exact telemetry read probes'
 	assert.match(readme, /no new database table or detailed telemetry upload, automatic pairing, BMS setting write or power command/i);
 	assert.match(docs, /sends\s+only\s+the\s+(?:two\s+)?established\s+(?:wake|read)\s+requests?\s+and\s+has\s+no\s+configuration[\s\S]{0,100}arbitrary-write capability/i);
 });
+
+test('the HyperCore cards show the exact failure so a rider can report it', () => {
+	const app = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+	assert.match(app, /hypercoreDetailsMarkup\(bms\)/);
+	assert.match(app, /hypercoreDetailsMarkup\(ecu\)/);
+	assert.match(app, /case 'ecu-selected': return 'That device is the HyperCore ECU, not the BMS/);
+	assert.match(app, /case 'bms-selected': return 'That device is the HyperCore BMS, not the ECU/);
+	assert.match(app, /bms\.reason === 'no-telemetry'/);
+});

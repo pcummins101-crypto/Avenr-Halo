@@ -792,3 +792,50 @@ test('a notify-only FFE1 with a sibling write channel is paired through auto-dis
 	assert.equal(ffe2.writes.length, 2);
 	assert.equal(ffe2.writes[0].method, 'with-response', 'a channel that supports acknowledged writes keeps them');
 });
+
+test('retries a notification start that fails once, as Android modules often do right after connecting', async () => {
+	const characteristic = new FakeCharacteristic();
+	let attempts = 0;
+	characteristic.startNotifications = async function startNotifications() {
+		attempts += 1;
+		if (attempts === 1) { const error = new Error('GATT operation failed for unknown reason'); error.name = 'NotSupportedError'; throw error; }
+		this.started += 1;
+		return this;
+	};
+	const runtime = makeBluetooth({ characteristic });
+	const { manager } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'waiting-for-data');
+	assert.equal(attempts, 2);
+	assert.equal(characteristic.writes.length, 2, 'the read requests follow the successful retry');
+});
+
+test('retries the first read request once before giving up on the link', async () => {
+	const characteristic = new FakeCharacteristic();
+	let writeAttempts = 0;
+	const original = characteristic.writeValueWithResponse.bind(characteristic);
+	characteristic.writeValueWithResponse = async function writeValueWithResponse(value) {
+		writeAttempts += 1;
+		if (writeAttempts === 1) { const error = new Error('GATT Error Unknown'); error.name = 'NetworkError'; throw error; }
+		return original(value);
+	};
+	characteristic.writeValue = async () => { throw new Error('unavailable'); };
+	characteristic.writeValueWithoutResponse = async () => { throw new Error('unavailable'); };
+	const runtime = makeBluetooth({ characteristic });
+	const { manager } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'waiting-for-data');
+	assert.equal(status.connected, true);
+	assert.ok(characteristic.writes.length >= 1);
+});
+
+test('a link that never opens after the retry carries the connect-failed reason and releases the device', async () => {
+	const runtime = makeBluetooth();
+	let attempts = 0;
+	runtime.device.gatt.connect = async function connect() { attempts += 1; const error = new Error('GATT connect failed'); error.name = 'NetworkError'; throw error; };
+	const { manager } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'error');
+	assert.equal(status.reason, 'connect-failed');
+	assert.equal(attempts, 2);
+});

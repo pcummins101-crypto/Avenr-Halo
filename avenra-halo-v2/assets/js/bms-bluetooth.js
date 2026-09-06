@@ -33,6 +33,14 @@
 	/* Generic GATT services that never carry BMS telemetry. */
 	const GENERIC_SERVICE_PREFIXES = Object.freeze(['00001800', '00001801', '0000180a', '0000180f']);
 	const TELEMETRY_HEADER = [0x7e, 0xa1, 0x11];
+	/* Some units answer the same status request with address byte B1 and
+	 * function 0x91; the vendor app treats both as a live status frame. */
+	const TELEMETRY_HEADER_ALT = [0x7e, 0xb1, 0x91];
+	const TELEMETRY_HEADERS = [TELEMETRY_HEADER, TELEMETRY_HEADER_ALT];
+	/* Status request length requested from the BMS. The vendor app asks for
+	 * 0xBE bytes; anything above 0xC0 makes the BMS answer in a two-part frame
+	 * layout that this decoder does not use. */
+	const WAKE_REQUEST_LENGTH = 0xbe;
 	const LEGACY_TELEMETRY_HEADER = [0xaa, 0x55, 0xaa];
 	const LEGACY_FRAME_BYTES = 140;
 	const MIN_FRAME_BYTES = 80;
@@ -56,7 +64,7 @@
 	}
 
 	function generateWakePing() {
-		const ping = new Uint8Array([0x7e, 0xa1, 0x01, 0x00, 0x00, 0xc8, 0x00, 0x00, 0xaa, 0x55]);
+		const ping = new Uint8Array([0x7e, 0xa1, 0x01, 0x00, 0x00, WAKE_REQUEST_LENGTH, 0x00, 0x00, 0xaa, 0x55]);
 		const crc = crc16Modbus(ping.slice(1, 6));
 		ping[6] = crc & 0xff;
 		ping[7] = (crc >>> 8) & 0xff;
@@ -120,7 +128,7 @@
 
 	function parseTelemetryFrame(input, timestamp) {
 		const frame = bytesFromValue(input);
-		if (frame.length < 10 || !TELEMETRY_HEADER.every((byte, index) => frame[index] === byte)) {
+		if (frame.length < 10 || !TELEMETRY_HEADERS.some((header) => header.every((byte, index) => frame[index] === byte))) {
 			throw new Error('The BMS frame header is invalid.');
 		}
 		const length = expectedFrameLength(frame, 0);
@@ -253,7 +261,7 @@
 
 	function findTelemetryHeader(bytes, start) {
 		for (let position = Number(start) || 0; position <= bytes.length - 3; position += 1) {
-			if (headerAt(bytes, position, TELEMETRY_HEADER)) return { position, protocol: 'modern' };
+			if (TELEMETRY_HEADERS.some((header) => headerAt(bytes, position, header))) return { position, protocol: 'modern' };
 			if (headerAt(bytes, position, LEGACY_TELEMETRY_HEADER)) return { position, protocol: 'legacy' };
 		}
 		return null;
@@ -263,10 +271,23 @@
 		for (let keep = 2; keep >= 1; keep -= 1) {
 			const start = bytes.length - keep;
 			if (start < 0) continue;
-			if (TELEMETRY_HEADER.slice(0, keep).every((byte, index) => bytes[start + index] === byte)) return keep;
+			if (TELEMETRY_HEADERS.some((header) => header.slice(0, keep).every((byte, index) => bytes[start + index] === byte))) return keep;
 			if (LEGACY_TELEMETRY_HEADER.slice(0, keep).every((byte, index) => bytes[start + index] === byte)) return keep;
 		}
 		return 0;
+	}
+
+	/* The vendor app chooses the protocol from the advertised name: an
+	 * "ANT-BLE" name that is exactly ten characters, or has a dash at index
+	 * ten, is an older unit that only answers the legacy probe; every other
+	 * ANT name (including "ANT@BLE...") is a modern unit that only answers the
+	 * 7E A1 request. Halo uses the same rule so that a unit is never sent the
+	 * request it does not understand. Unknown names keep both probes. */
+	function protocolHintFromName(name) {
+		const value = String(name || '').trim();
+		if (!/^ANT/i.test(value)) return null;
+		if (/^ANT-BLE/i.test(value) && (value.length === 10 || value.charAt(10) === '-')) return 'legacy';
+		return 'modern';
 	}
 
 	class AvenraHaloBmsDecoder {
@@ -342,8 +363,10 @@
 				acceptAllDevices: true,
 				optionalServiceUuids: OPTIONAL_SERVICE_UUIDS.slice(),
 				autoDiscover: true,
-				wakeDelayMs: 200,
+				wakeDelayMs: 1000,
 				legacyProbeDelayMs: 50,
+				silentReconnectAfterProbes: 5,
+				silentReconnectLimit: 1,
 				connectTimeoutMs: 15000,
 				retryDelayMs: 500,
 				discoveryTimeoutMs: 5000,
@@ -383,6 +406,9 @@
 			this.pendingOperations = new Set();
 			this.destroyed = false;
 			this.discoveryHint = '';
+			this.protocolHint = null;
+			this.silentProbes = 0;
+			this.silentReconnects = 0;
 			this.boundValueChanged = (event) => this._handleValueChanged(event);
 			this.boundDisconnected = () => this._handleGattDisconnected();
 		}
@@ -493,35 +519,12 @@
 					return this.getStatus();
 				}
 				this.device = device;
+				this.protocolHint = protocolHintFromName(device.name);
+				this.silentProbes = 0;
+				this.silentReconnects = 0;
 				device.addEventListener?.('gattserverdisconnected', this.boundDisconnected);
 				this._setStatus('connecting', { reason: 'device-selected' });
-				const server = await this._connectGatt(device, generation);
-				if (!this._isCurrent(generation)) {
-					this._disconnectDevice(device);
-					return this.getStatus();
-				}
-				this.server = server;
-				const discovered = await this._discoverTransport(server, generation);
-				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
-				this.activeTransport = discovered.transport;
-				this.notifyCharacteristic = discovered.notifyCharacteristic;
-				this.writeCharacteristic = discovered.writeCharacteristic;
-				// Retain the original public field as an alias for callers that only knew
-				// the shared FFE1 transport. Notifications always come from this channel.
-				this.characteristic = discovered.notifyCharacteristic;
-				this.notifyCharacteristic.addEventListener?.('characteristicvaluechanged', this.boundValueChanged);
-				await this._startNotifications(this.notifyCharacteristic, generation);
-				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
-				// Some BMS units notify as soon as notifications start. Do not
-				// overwrite an already-valid live reading with a waiting state.
-				if (!this.lastTelemetryAt) this._setStatus('waiting-for-data', { reason: 'notifications-started' });
-				this._armStaleTimer(generation);
-				await this.options.sleep(this.options.wakeDelayMs);
-				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
-				await this._retryOnce(() => this._sendProbeCycle(generation), generation, 'probe-write-failed');
-				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
-				this._startPingTimer(generation);
-				return this.getStatus();
+				return await this._openLink(device, generation);
 			} catch (error) {
 				if (!this._isCurrent(generation)) {
 					this._disconnectDevice(device);
@@ -535,6 +538,78 @@
 					reason: cancelled ? 'selection-cancelled' : (error && error.haloReason) || 'connection-failed',
 					error: cancelled ? null : error
 				});
+			}
+		}
+
+		/* Everything after the rider's choice: GATT link, transport discovery,
+		 * notifications, the first read request and the polling timer. Also used
+		 * for the automatic reconnect of a silent link. */
+		async _openLink(device, generation) {
+			const server = await this._connectGatt(device, generation);
+			if (!this._isCurrent(generation)) {
+				this._disconnectDevice(device);
+				return this.getStatus();
+			}
+			this.server = server;
+			const discovered = await this._discoverTransport(server, generation);
+			if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
+			this.activeTransport = discovered.transport;
+			this.notifyCharacteristic = discovered.notifyCharacteristic;
+			this.writeCharacteristic = discovered.writeCharacteristic;
+			// Retain the original public field as an alias for callers that only knew
+			// the shared FFE1 transport. Notifications always come from this channel.
+			this.characteristic = discovered.notifyCharacteristic;
+			this.notifyCharacteristic.addEventListener?.('characteristicvaluechanged', this.boundValueChanged);
+			await this._startNotifications(this.notifyCharacteristic, generation);
+			if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
+			// Some BMS units notify as soon as notifications start. Do not
+			// overwrite an already-valid live reading with a waiting state.
+			if (!this.lastTelemetryAt) this._setStatus('waiting-for-data', { reason: 'notifications-started' });
+			this._armStaleTimer(generation);
+			await this.options.sleep(this.options.wakeDelayMs);
+			if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
+			await this._retryOnce(() => this._sendProbeCycle(generation), generation, 'probe-write-failed');
+			if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
+			this._startPingTimer(generation);
+			return this.getStatus();
+		}
+
+		_trackSilentLink(generation) {
+			if (!this._isCurrent(generation) || !this.connected || this.lastTelemetryAt) return;
+			this.silentProbes += 1;
+			if (this.silentProbes >= this.options.silentReconnectAfterProbes && this.silentReconnects < this.options.silentReconnectLimit) {
+				this._reconnectSilentLink(generation).catch(() => {});
+			}
+		}
+
+		/* The vendor app drops and reopens the link when several requests go
+		 * unanswered; some modules only start answering on a fresh connection.
+		 * Halo does the same once, on the device already chosen, without opening
+		 * another chooser. */
+		async _reconnectSilentLink(previousGeneration) {
+			if (!this._isCurrent(previousGeneration) || !this.device) return this.getStatus();
+			const device = this.device;
+			this.silentReconnects += 1;
+			this.silentProbes = 0;
+			const generation = ++this.generation;
+			this._cancelPendingOperations('silent-link-reconnect');
+			await this._cleanupConnection(true);
+			if (this.destroyed || generation !== this.generation) return this.getStatus();
+			this.device = device;
+			this.protocol = null;
+			this.decoder.reset();
+			device.addEventListener?.('gattserverdisconnected', this.boundDisconnected);
+			this._setStatus('connecting', { reason: 'silent-link-reconnect' });
+			await this.options.sleep(this.options.retryDelayMs);
+			if (!this._isCurrent(generation)) return this.getStatus();
+			try {
+				return await this._openLink(device, generation);
+			} catch (error) {
+				if (!this._isCurrent(generation)) return this.getStatus();
+				this.generation += 1;
+				this._cancelPendingOperations('connection-ended');
+				await this._cleanupConnection(true);
+				return this._setStatus('error', { reason: (error && error.haloReason) || 'connection-failed', error });
 			}
 		}
 
@@ -798,7 +873,7 @@
 		_startPingTimer(generation) {
 			this._clearPingTimer();
 			this.pingTimer = this.options.setInterval(() => {
-				this._sendProbeCycle(generation).catch((error) => {
+				this._sendProbeCycle(generation).then(() => this._trackSilentLink(generation), (error) => {
 					if (this._isCurrent(generation) && this.connected) {
 						this._setStatus('stale', { reason: 'wake-write-failed', error });
 					}
@@ -807,8 +882,9 @@
 		}
 
 		async _sendProbeCycle(generation) {
-			if (this.protocol === 'legacy') return this._sendLegacyProbe(generation);
-			if (this.protocol === 'modern') return this._sendWakePing(generation);
+			const protocol = this.protocol || this.protocolHint;
+			if (protocol === 'legacy') return this._sendLegacyProbe(generation);
+			if (protocol === 'modern') return this._sendWakePing(generation);
 			let modernSent = false;
 			let modernError = null;
 			try {
@@ -928,6 +1004,7 @@
 				if (!this.protocol) this.protocol = reading.protocol;
 				this.telemetry = reading;
 				this.lastTelemetryAt = reading.measuredAtMs;
+				this.silentProbes = 0;
 				this.lastError = '';
 				if (this.status !== 'live') this._setStatus('live', { reason: 'telemetry-received' });
 				this._emit('telemetry', Object.assign({}, reading));
@@ -1015,7 +1092,11 @@
 		SECONDARY_NOTIFY_CHARACTERISTIC_UUID,
 		SECONDARY_WRITE_CHARACTERISTIC_UUID,
 		OPTIONAL_SERVICE_UUIDS,
+		TELEMETRY_HEADER,
+		TELEMETRY_HEADER_ALT,
+		WAKE_REQUEST_LENGTH,
 		LEGACY_FRAME_BYTES,
+		protocolHintFromName,
 		crc16Modbus,
 		generateWakePing,
 		generateLegacyProbe,

@@ -12,6 +12,8 @@ const {
 	FALLBACK_WRITE_CHARACTERISTIC_UUID,
 	SECONDARY_SERVICE_UUID,
 	OPTIONAL_SERVICE_UUIDS,
+	WAKE_REQUEST_LENGTH,
+	protocolHintFromName,
 	LEGACY_FRAME_BYTES,
 	crc16Modbus,
 	generateWakePing,
@@ -233,7 +235,7 @@ test('retains both HyperCore BMS transports and the two exact read-only probes',
 	assert.equal(FALLBACK_SERVICE_UUID, '0000ff00-0000-1000-8000-00805f9b34fb');
 	assert.equal(FALLBACK_NOTIFY_CHARACTERISTIC_UUID, '0000ff01-0000-1000-8000-00805f9b34fb');
 	assert.equal(FALLBACK_WRITE_CHARACTERISTIC_UUID, '0000ff02-0000-1000-8000-00805f9b34fb');
-	assert.equal(Buffer.from(generateWakePing()).toString('hex'), '7ea1010000c899b3aa55');
+	assert.equal(Buffer.from(generateWakePing()).toString('hex'), '7ea1010000be1855aa55');
 	assert.equal(Buffer.from(generateLegacyProbe()).toString('hex'), 'dbdb00000000');
 	assert.notEqual(generateWakePing(), generateWakePing(), 'each write receives its own immutable payload');
 	assert.notEqual(generateLegacyProbe(), generateLegacyProbe(), 'each legacy probe receives its own immutable payload');
@@ -379,7 +381,7 @@ test('connects only on request, advertises both services and probes both protoco
 	assert.equal(runtime.characteristic.started, 1);
 	assert.equal(runtime.characteristic.listenerCount('characteristicvaluechanged'), 1);
 	assert.equal(runtime.characteristic.writes.length, 2);
-	assert.equal(Buffer.from(runtime.characteristic.writes[0].value).toString('hex'), '7ea1010000c899b3aa55');
+	assert.equal(Buffer.from(runtime.characteristic.writes[0].value).toString('hex'), '7ea1010000be1855aa55');
 	assert.equal(Buffer.from(runtime.characteristic.writes[1].value).toString('hex'), 'dbdb00000000');
 	assert.equal(timers.intervals.size, 1);
 
@@ -398,7 +400,7 @@ test('connects only on request, advertises both services and probes both protoco
 	timers.runIntervals();
 	await new Promise((resolve) => setImmediate(resolve));
 	assert.equal(runtime.characteristic.writes.length, 3);
-	assert.equal(Buffer.from(runtime.characteristic.writes[2].value).toString('hex'), '7ea1010000c899b3aa55', 'a valid modern frame locks later polling to the modern request');
+	assert.equal(Buffer.from(runtime.characteristic.writes[2].value).toString('hex'), '7ea1010000be1855aa55', 'a valid modern frame locks later polling to the modern request');
 	await manager.disconnect('test-complete');
 });
 
@@ -421,7 +423,7 @@ test('uses FF00 with independent FF01 notify and FF02 write channels and locks l
 	assert.equal(notifyCharacteristic.started, 1);
 	assert.equal(notifyCharacteristic.writes.length, 0);
 	assert.deepEqual(writeCharacteristic.writes.map((entry) => Buffer.from(entry.value).toString('hex')), [
-		'7ea1010000c899b3aa55',
+		'7ea1010000be1855aa55',
 		'dbdb00000000'
 	]);
 
@@ -478,7 +480,7 @@ test('uses compatible characteristic write fallbacks without changing the payloa
 	const { manager } = makeManager(runtime);
 	await manager.connect();
 	assert.equal(characteristic.writes[0].method, 'write');
-	assert.equal(Buffer.from(characteristic.writes[0].value).toString('hex'), '7ea1010000c899b3aa55');
+	assert.equal(Buffer.from(characteristic.writes[0].value).toString('hex'), '7ea1010000be1855aa55');
 	await manager.disconnect();
 
 	const fallbackCharacteristic = new FakeCharacteristic({ failWithResponse: true, failWrite: true });
@@ -519,7 +521,7 @@ test('an unknown protocol stays connectable when only one exact read probe is ac
 	const modernManager = makeManager(modernRuntime).manager;
 	status = await modernManager.connect();
 	assert.equal(status.connected, true);
-	assert.deepEqual(modernOnly.writes.map((entry) => Buffer.from(entry.value).toString('hex')), ['7ea1010000c899b3aa55']);
+	assert.deepEqual(modernOnly.writes.map((entry) => Buffer.from(entry.value).toString('hex')), ['7ea1010000be1855aa55']);
 	modernOnly.notify(makeFrame());
 	assert.equal(modernManager.getStatus().protocol, 'modern');
 	await modernManager.disconnect();
@@ -723,7 +725,7 @@ test('falls back to characteristic auto-discovery when no known BMS service is p
 	assert.equal(runtime.rx.started, 1, 'notifications start on the notify-capable characteristic');
 	assert.equal(runtime.tx.writes.length, 2, 'both read-only probes go to the write-capable characteristic');
 	assert.equal(runtime.tx.writes[0].method, 'without-response', 'a write-without-response-only channel is honoured');
-	assert.equal(Buffer.from(runtime.tx.writes[0].value).toString('hex'), '7ea1010000c899b3aa55');
+	assert.equal(Buffer.from(runtime.tx.writes[0].value).toString('hex'), '7ea1010000be1855aa55');
 	assert.equal(Buffer.from(runtime.tx.writes[1].value).toString('hex'), 'dbdb00000000');
 	runtime.rx.notify(makeFrame());
 	assert.equal(manager.getStatus().status, 'live');
@@ -838,4 +840,84 @@ test('a link that never opens after the retry carries the connect-failed reason 
 	assert.equal(status.status, 'error');
 	assert.equal(status.reason, 'connect-failed');
 	assert.equal(attempts, 2);
+});
+
+test('sends the vendor status request (0xBE bytes) rather than a length the BMS answers in a two-part frame', () => {
+	assert.equal(WAKE_REQUEST_LENGTH, 0xbe);
+	assert.equal(Buffer.from(generateWakePing()).toString('hex'), '7ea1010000be1855aa55');
+});
+
+test('decodes a status frame that answers with the B1/91 header variant', () => {
+	const frame = makeFrame({ socRaw: 64 });
+	frame[1] = 0xb1;
+	frame[2] = 0x91;
+	const length = frame.length;
+	const crc = crc16Modbus(frame.subarray(1, length - 4));
+	frame[length - 4] = crc & 0xff;
+	frame[length - 3] = (crc >>> 8) & 0xff;
+	const reading = parseTelemetryFrame(frame, 1_700_000_000_000);
+	assert.equal(reading.protocol, 'modern');
+	assert.equal(reading.soc, 64);
+	const decoder = new AvenraHaloBmsDecoder();
+	assert.equal(decoder.push(frame, 1_700_000_000_000).length, 1);
+});
+
+test('chooses the protocol from the ANT device name the way the vendor app does', () => {
+	assert.equal(protocolHintFromName('ANT-BLE1F2'), 'legacy');
+	assert.equal(protocolHintFromName('ANT-BLE1F2-01'), 'legacy');
+	assert.equal(protocolHintFromName('ANT@BLE24CBCB-2001'), 'modern');
+	assert.equal(protocolHintFromName('ANT-BLE24CBCB2001'), 'modern');
+	assert.equal(protocolHintFromName('HyperCore BMS'), null);
+	assert.equal(protocolHintFromName(''), null);
+});
+
+test('a modern-named unit is only ever sent the 7E A1 request', async () => {
+	const runtime = makeBluetooth();
+	runtime.device.name = 'ANT@BLE24CBCB-2001';
+	const { manager, timers } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'waiting-for-data');
+	assert.deepEqual(runtime.characteristic.writes.map((entry) => Buffer.from(entry.value).toString('hex')), ['7ea1010000be1855aa55']);
+	timers.runIntervals();
+	await new Promise((resolve) => setImmediate(resolve));
+	assert.deepEqual(runtime.characteristic.writes.map((entry) => Buffer.from(entry.value).toString('hex')), ['7ea1010000be1855aa55', '7ea1010000be1855aa55']);
+	await manager.disconnect('test-complete');
+});
+
+test('an older ANT-BLE unit is only ever sent the legacy probe', async () => {
+	const runtime = makeBluetooth();
+	runtime.device.name = 'ANT-BLE1F2';
+	const { manager } = makeManager(runtime);
+	await manager.connect();
+	assert.deepEqual(runtime.characteristic.writes.map((entry) => Buffer.from(entry.value).toString('hex')), ['dbdb00000000']);
+	runtime.characteristic.notify(makeLegacyFrame({ socRaw: 41 }));
+	assert.equal(manager.getStatus().protocol, 'legacy');
+	await manager.disconnect('test-complete');
+});
+
+test('reopens a silent link once on the same device without a second chooser', async () => {
+	const runtime = makeBluetooth();
+	runtime.device.name = 'ANT@BLE24CBCB-2001';
+	const { manager, timers, statuses } = makeManager(runtime);
+	await manager.connect();
+	const connects = () => runtime.calls.filter(([kind]) => kind === 'connect').length;
+	const requests = () => runtime.calls.filter(([kind]) => kind === 'request').length;
+	assert.equal(connects(), 1);
+	for (let probe = 0; probe < 5; probe += 1) {
+		timers.runIntervals();
+		await new Promise((resolve) => setImmediate(resolve));
+	}
+	for (let settle = 0; settle < 10; settle += 1) await new Promise((resolve) => setImmediate(resolve));
+	assert.equal(connects(), 2, 'five unanswered requests reopen the GATT link');
+	assert.equal(requests(), 1, 'the rider is not asked to choose again');
+	assert.ok(statuses.some((status) => status.reason === 'silent-link-reconnect'));
+	assert.equal(manager.getStatus().connected, true);
+	runtime.characteristic.notify(makeFrame({ socRaw: 77 }));
+	assert.equal(manager.getStatus().status, 'live');
+	for (let probe = 0; probe < 6; probe += 1) {
+		timers.runIntervals();
+		await new Promise((resolve) => setImmediate(resolve));
+	}
+	assert.equal(connects(), 2, 'a live link is never reopened');
+	await manager.disconnect('test-complete');
 });

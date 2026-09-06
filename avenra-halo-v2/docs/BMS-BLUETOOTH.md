@@ -106,10 +106,20 @@ write path. Its only outgoing values are the fixed read requests above.
   written without response. Nothing is written during discovery, and an `FFE0`
   service that only carries the ECU's `FFEC` channel is reported as the wrong
   module.
-- Modern wake request: `7e a1 01 00 00 c8 99 b3 aa 55`
+- Modern wake request: `7e a1 01 00 00 be 18 55 aa 55` (the vendor app's
+  request; a requested length above `0xC0` makes the BMS answer in a two-part
+  frame layout that Halo does not decode)
 - Legacy read probe: `db db 00 00 00 00`
-- Wake cadence: once after notifications start, then every two seconds
-- Modern status header: `7e a1 11`; legacy status header: `aa 55 aa`
+- Protocol choice from the advertised name, as in the vendor app: an
+  `ANT-BLE` name that is exactly ten characters or has a dash at index ten is
+  an older unit and receives only the legacy probe; any other `ANT` name
+  (including `ANT@BLE...`) is a modern unit and receives only the modern
+  request; other names receive both until one is answered
+- Wake cadence: one second after notifications start, then every two seconds
+- Modern status header: `7e a1 11` or `7e b1 91`; legacy status header: `aa 55 aa`
+- Silent link: after five unanswered requests Halo drops and reopens the GATT
+  link once on the same device, without a second chooser, as the vendor app
+  does; a link that stays silent is then shown as **No data**
 - CRC: CRC-16/MODBUS over bytes after `7E` through the final data byte,
   little-endian, followed by `AA 55`
 

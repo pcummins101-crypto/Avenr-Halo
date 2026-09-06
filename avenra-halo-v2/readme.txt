@@ -4,7 +4,7 @@ Tags: avenra, halo, motorcycle, pwa, customer-portal
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.7.4
+Stable tag: 2.7.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -104,6 +104,9 @@ Browser-private storage is origin/profile scoped, not application-encrypted stor
 Halo Community is disabled until a rider explicitly joins. Its public identity is limited to a rider-chosen username and optional bio; customer identity, motorcycles, rides, locations, Emergency Assist information and ride-risk indicators are not exposed through Community. Direct messages are stored by Halo and are not end-to-end encrypted. See `docs/COMMUNITY.md` before launch.
 
 == Changelog ==
+
+= 2.7.5 =
+* Aligned HyperCore BMS communication with the official ANT BMS app: Halo now sends the vendor status request (0xBE bytes, not 0xC8, which makes the BMS reply in a two-part frame Halo did not decode), accepts the 7E B1 91 status header, chooses the legacy or modern request from the unit's advertised name so a unit is never sent a request it does not understand, waits one second after notifications start, and reopens a silent link once on the same device before reporting No data.
 
 = 2.7.4 =
 * Made HyperCore BMS pairing resilient to first-operation Bluetooth failures on Android: the connection, the notification start and the first read request are each retried once, and the connection timeout is longer.

@@ -4,7 +4,7 @@ Tags: avenra, halo, motorcycle, pwa, customer-portal
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.7.2
+Stable tag: 2.7.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -104,6 +104,10 @@ Browser-private storage is origin/profile scoped, not application-encrypted stor
 Halo Community is disabled until a rider explicitly joins. Its public identity is limited to a rider-chosen username and optional bio; customer identity, motorcycles, rides, locations, Emergency Assist information and ride-risk indicators are not exposed through Community. Direct messages are stored by Halo and are not end-to-end encrypted. See `docs/COMMUNITY.md` before launch.
 
 == Changelog ==
+
+= 2.7.3 =
+* Fixed HyperCore BMS pairing failing with "could not open the BMS data link". The BMS chooser now lists every nearby device instead of only those advertising a known service, Halo auto-discovers the notify and write characteristics when a module does not use the known FFE0/FF00/FFF0 layout, honours write-without-response-only channels, and adds the FFF0/FFF1/FFF2 transport.
+* Halo now tells the rider when the HyperCore ECU was chosen in the BMS chooser (or the BMS in the ECU chooser), and distinguishes a connection that never opened from a data stream that never started, instead of one generic message.
 
 = 2.7.2 =
 * Fixed false crash detections during normal riding. A possible crash now needs a sustained impact across several motion samples while a fresh GPS fix shows the bike moving, and then confirmation from an abrupt stop, a sustained tip-over or a severe impact; a single sensor spike, a bump followed by ordinary braking to a halt, or a stale speed from a lost GPS signal can no longer start the 20-second countdown.

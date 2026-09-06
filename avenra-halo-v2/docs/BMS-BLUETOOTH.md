@@ -11,6 +11,9 @@ mode and manual starting-charge entry remain available without either link.
 2. Open **Vehicle → HyperCore**.
 3. Choose **Connect HyperCore ECU** and select the ECU in the phone-owned chooser.
 4. Choose **Connect HyperCore BMS** and select the BMS in the second chooser.
+   The BMS chooser lists every nearby Bluetooth device, because a BMS module
+   does not always advertise its serial service and a service filter could hide
+   the unit while still listing the ECU. Choose the battery module, not the ECU.
 5. Halo reports **HyperCore live** only after both units deliver valid telemetry.
    If one unit is live, Halo reports **HyperCore partial** and identifies the
    available component without hiding its data.
@@ -19,6 +22,12 @@ Web Bluetooth requires each physical-device chooser to begin from a fresh rider
 gesture, so Halo deliberately keeps two connection buttons on the same screen.
 It never pairs automatically. Raw Bluetooth device names are not repeated in
 Halo because firmware names may expose supplier terminology.
+
+If the wrong module is chosen, Halo says so: the ECU picked in the BMS chooser
+is reported as **That device is the HyperCore ECU, not the BMS**, and the BMS
+picked in the ECU chooser is reported the other way round. A link that never
+opened, and a link that opened without a data stream, each carry their own
+instruction instead of one generic message.
 
 Ride start is disabled only while a chooser or connection is actively opening.
 Live, partial, delayed and unavailable telemetry never end an active ride. Halo
@@ -69,6 +78,16 @@ write path. Its only outgoing values are the fixed read requests above.
 - Primary transport: service `FFE0` with shared notify/write characteristic `FFE1`
 - Compatible transport: service `FF00`, notify characteristic `FF01`, write
   characteristic `FF02`
+- Secondary transport: service `FFF0`, notify characteristic `FFF1`, write
+  characteristic `FFF2`
+- Auto-discovery: when none of the above exists, Halo inspects every permitted
+  service (`FFE0`, `FF00`, `FFF0`, `FFE5`, `FEE7` and the Nordic UART service),
+  skips the generic GATT services, and uses the first characteristic that
+  notifies together with the first that accepts writes, preferring one
+  characteristic that does both. A write-without-response-only channel is
+  written without response. Nothing is written during discovery, and an `FFE0`
+  service that only carries the ECU's `FFEC` channel is reported as the wrong
+  module.
 - Modern wake request: `7e a1 01 00 00 c8 99 b3 aa 55`
 - Legacy read probe: `db db 00 00 00 00`
 - Wake cadence: once after notifications start, then every two seconds

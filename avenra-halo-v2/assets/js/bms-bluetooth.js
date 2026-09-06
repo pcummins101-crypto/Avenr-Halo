@@ -15,6 +15,23 @@
 	const FALLBACK_SERVICE_UUID = '0000ff00-0000-1000-8000-00805f9b34fb';
 	const FALLBACK_NOTIFY_CHARACTERISTIC_UUID = '0000ff01-0000-1000-8000-00805f9b34fb';
 	const FALLBACK_WRITE_CHARACTERISTIC_UUID = '0000ff02-0000-1000-8000-00805f9b34fb';
+	const SECONDARY_SERVICE_UUID = '0000fff0-0000-1000-8000-00805f9b34fb';
+	const SECONDARY_NOTIFY_CHARACTERISTIC_UUID = '0000fff1-0000-1000-8000-00805f9b34fb';
+	const SECONDARY_WRITE_CHARACTERISTIC_UUID = '0000fff2-0000-1000-8000-00805f9b34fb';
+	const ECU_CHARACTERISTIC_UUID = '0000ffec-0000-1000-8000-00805f9b34fb';
+	/* Services a BMS Bluetooth module may use for its serial bridge. Web
+	 * Bluetooth only exposes services that were requested up front, so every
+	 * candidate that auto-discovery may need has to be listed here. */
+	const OPTIONAL_SERVICE_UUIDS = Object.freeze([
+		SERVICE_UUID,
+		FALLBACK_SERVICE_UUID,
+		SECONDARY_SERVICE_UUID,
+		'0000ffe5-0000-1000-8000-00805f9b34fb',
+		'0000fee7-0000-1000-8000-00805f9b34fb',
+		'6e400001-b5a3-f393-e0a9-e50e24dcca9e'
+	]);
+	/* Generic GATT services that never carry BMS telemetry. */
+	const GENERIC_SERVICE_PREFIXES = Object.freeze(['00001800', '00001801', '0000180a', '0000180f']);
 	const TELEMETRY_HEADER = [0x7e, 0xa1, 0x11];
 	const LEGACY_TELEMETRY_HEADER = [0xaa, 0x55, 0xaa];
 	const LEGACY_FRAME_BYTES = 140;
@@ -316,6 +333,15 @@
 				fallbackServiceUuid: FALLBACK_SERVICE_UUID,
 				fallbackNotifyCharacteristicUuid: FALLBACK_NOTIFY_CHARACTERISTIC_UUID,
 				fallbackWriteCharacteristicUuid: FALLBACK_WRITE_CHARACTERISTIC_UUID,
+				secondaryServiceUuid: SECONDARY_SERVICE_UUID,
+				secondaryNotifyCharacteristicUuid: SECONDARY_NOTIFY_CHARACTERISTIC_UUID,
+				secondaryWriteCharacteristicUuid: SECONDARY_WRITE_CHARACTERISTIC_UUID,
+				/* The chooser lists every nearby device. A BMS module does not always
+				 * advertise its serial service, so a service filter can hide the very
+				 * unit the rider is trying to pair while still listing the ECU. */
+				acceptAllDevices: true,
+				optionalServiceUuids: OPTIONAL_SERVICE_UUIDS.slice(),
+				autoDiscover: true,
 				wakeDelayMs: 200,
 				legacyProbeDelayMs: 50,
 				connectTimeoutMs: 10000,
@@ -355,6 +381,7 @@
 			this.connectPromise = null;
 			this.pendingOperations = new Set();
 			this.destroyed = false;
+			this.discoveryHint = '';
 			this.boundValueChanged = (event) => this._handleValueChanged(event);
 			this.boundDisconnected = () => this._handleGattDisconnected();
 		}
@@ -450,15 +477,12 @@
 			this.lastTelemetryAt = 0;
 			this.protocol = null;
 			this.activeTransport = null;
+			this.discoveryHint = '';
 			const generation = ++this.generation;
 			this._setStatus('scanning', { reason: 'user-request' });
 			let device = null;
 			try {
-				const serviceUuids = [...new Set(this._transportCandidates().map((transport) => transport.serviceUuid))];
-				const deviceRequest = Promise.resolve(this.options.bluetooth.requestDevice({
-					filters: serviceUuids.map((serviceUuid) => ({ services: [serviceUuid] })),
-					optionalServices: serviceUuids
-				}));
+				const deviceRequest = Promise.resolve(this.options.bluetooth.requestDevice(this._chooserRequest()));
 				deviceRequest.then((selected) => {
 					if (!this._isCurrent(generation)) this._disconnectDevice(selected);
 				}, () => {});
@@ -474,7 +498,7 @@
 				serverRequest.then(() => {
 					if (!this._isCurrent(generation) || this.device !== device) this._disconnectDevice(device);
 				}, () => {});
-				const server = await this._awaitOperation(serverRequest, this.options.connectTimeoutMs, 'The Bluetooth connection timed out.');
+				const server = await this._awaitOperation(serverRequest, this.options.connectTimeoutMs, 'The Bluetooth connection timed out.', 'connect-failed');
 				if (!this._isCurrent(generation)) {
 					this._disconnectDevice(device);
 					return this.getStatus();
@@ -492,7 +516,8 @@
 				await this._awaitOperation(
 					Promise.resolve(this.notifyCharacteristic.startNotifications()),
 					this.options.notificationTimeoutMs,
-					'The BMS notification stream did not start in time.'
+					'The BMS notification stream did not start in time.',
+					'notifications-failed'
 				);
 				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
 				// Some BMS units notify as soon as notifications start. Do not
@@ -510,15 +535,22 @@
 					this._disconnectDevice(device);
 					return this.getStatus();
 				}
-				const cancelled = error && error.name === 'NotFoundError';
+				const cancelled = error && error.name === 'NotFoundError' && !device;
 				this.generation += 1;
 				this._cancelPendingOperations('connection-ended');
 				await this._cleanupConnection(true);
 				return this._setStatus(cancelled ? 'idle' : 'error', {
-					reason: cancelled ? 'selection-cancelled' : 'connection-failed',
+					reason: cancelled ? 'selection-cancelled' : (error && error.haloReason) || 'connection-failed',
 					error: cancelled ? null : error
 				});
 			}
+		}
+
+		_chooserRequest() {
+			const serviceUuids = [...new Set(this._transportCandidates().map((transport) => transport.serviceUuid))];
+			const optionalServices = [...new Set([...serviceUuids, ...(this.options.optionalServiceUuids || [])])];
+			if (this.options.acceptAllDevices) return { acceptAllDevices: true, optionalServices };
+			return { filters: serviceUuids.map((serviceUuid) => ({ services: [serviceUuid] })), optionalServices };
 		}
 
 		_transportCandidates() {
@@ -534,6 +566,12 @@
 					serviceUuid: this.options.fallbackServiceUuid,
 					notifyCharacteristicUuid: this.options.fallbackNotifyCharacteristicUuid,
 					writeCharacteristicUuid: this.options.fallbackWriteCharacteristicUuid
+				},
+				{
+					name: 'fff0',
+					serviceUuid: this.options.secondaryServiceUuid,
+					notifyCharacteristicUuid: this.options.secondaryNotifyCharacteristicUuid,
+					writeCharacteristicUuid: this.options.secondaryWriteCharacteristicUuid
 				}
 			].filter((transport, index, transports) => transport.serviceUuid
 				&& transport.notifyCharacteristicUuid
@@ -566,16 +604,115 @@
 							this.options.discoveryTimeoutMs,
 							'The HyperCore BMS read-request channel was not found in time.'
 						);
+					// Where the browser exposes characteristic properties, a known UUID
+					// that cannot actually notify or accept writes must not be trusted:
+					// some modules keep FFE1 notify-only and write through a sibling.
+					if (!this._characteristicSupports(notifyCharacteristic, 'notify') || !this._characteristicSupports(writeCharacteristic, 'write')) {
+						const roleMismatch = new Error('The known BMS characteristics do not carry the expected notify and write roles.');
+						roleMismatch.name = 'NotSupportedError';
+						throw roleMismatch;
+					}
 					return { transport, notifyCharacteristic, writeCharacteristic };
 				} catch (error) {
 					lastError = error;
 					if (!this._isCurrent(generation)) throw error;
 				}
 			}
-			const roleError = new Error('The selected Bluetooth device does not expose a supported HyperCore BMS telemetry transport.');
+			if (this.options.autoDiscover) {
+				const discovered = await this._autoDiscoverTransport(server, generation);
+				if (discovered) return discovered;
+			}
+			const roleError = new Error(this.discoveryHint === 'ecu-selected'
+				? 'The selected Bluetooth device is the HyperCore ECU, not the HyperCore BMS.'
+				: 'The selected Bluetooth device does not expose a supported HyperCore BMS telemetry transport.');
 			roleError.name = 'NotSupportedError';
+			roleError.haloReason = this.discoveryHint === 'ecu-selected' ? 'ecu-selected' : 'transport-missing';
 			roleError.cause = lastError;
 			throw roleError;
+		}
+
+		_characteristicSupports(characteristic, role) {
+			const properties = characteristic && characteristic.properties;
+			if (!properties || typeof properties !== 'object') return true;
+			if (role === 'notify') return Boolean(properties.notify || properties.indicate);
+			return Boolean(properties.write || properties.writeWithoutResponse);
+		}
+
+		/* Mirror the vendor tooling: when no known service/characteristic pair
+		 * exists, look through every permitted service for one characteristic
+		 * that notifies and one that accepts writes. Generic GATT services are
+		 * skipped. Nothing is written during discovery. */
+		async _autoDiscoverTransport(server, generation) {
+			this.discoveryHint = '';
+			if (!server || typeof server.getPrimaryServices !== 'function') return null;
+			let services = [];
+			try {
+				services = await this._awaitOperation(
+					Promise.resolve(server.getPrimaryServices()),
+					this.options.discoveryTimeoutMs,
+					'The Bluetooth service list was not available in time.'
+				);
+			} catch (error) {
+				if (!this._isCurrent(generation)) throw error;
+				return null;
+			}
+			if (!this._isCurrent(generation)) throw new Error('The BMS discovery was cancelled.');
+			let ecuSeen = false;
+			let bestNotify = null;
+			let bestWrite = null;
+			let bestService = null;
+			for (const service of Array.isArray(services) ? services : []) {
+				const serviceUuid = String(service && service.uuid ? service.uuid : '').toLowerCase();
+				if (GENERIC_SERVICE_PREFIXES.some((prefix) => serviceUuid.startsWith(prefix))) continue;
+				let characteristics = [];
+				try {
+					characteristics = await this._awaitOperation(
+						Promise.resolve(service.getCharacteristics()),
+						this.options.discoveryTimeoutMs,
+						'The Bluetooth characteristic list was not available in time.'
+					);
+				} catch (error) {
+					if (!this._isCurrent(generation)) throw error;
+					continue;
+				}
+				if (!this._isCurrent(generation)) throw new Error('The BMS discovery was cancelled.');
+				let notify = null;
+				let write = null;
+				for (const characteristic of Array.isArray(characteristics) ? characteristics : []) {
+					const uuid = String(characteristic && characteristic.uuid ? characteristic.uuid : '').toLowerCase();
+					if (uuid === ECU_CHARACTERISTIC_UUID) ecuSeen = true;
+					const properties = characteristic && characteristic.properties ? characteristic.properties : {};
+					const canNotify = Boolean(properties.notify || properties.indicate);
+					const canWrite = Boolean(properties.write || properties.writeWithoutResponse);
+					if (canNotify && canWrite && uuid !== ECU_CHARACTERISTIC_UUID) {
+						notify = characteristic;
+						write = characteristic;
+						break;
+					}
+					if (canNotify && !notify && uuid !== ECU_CHARACTERISTIC_UUID) notify = characteristic;
+					if (canWrite && !write) write = characteristic;
+				}
+				if (notify && write && !bestNotify) {
+					bestNotify = notify;
+					bestWrite = write;
+					bestService = serviceUuid;
+					if (notify === write) break;
+				}
+			}
+			if (!bestNotify || !bestWrite) {
+				this.discoveryHint = ecuSeen ? 'ecu-selected' : 'transport-missing';
+				return null;
+			}
+			return {
+				transport: {
+					name: 'auto',
+					serviceUuid: bestService,
+					notifyCharacteristicUuid: String(bestNotify.uuid || ''),
+					writeCharacteristicUuid: String(bestWrite.uuid || '')
+				},
+				notifyCharacteristic: bestNotify,
+				writeCharacteristic: bestWrite
+			};
 		}
 
 		async _lateConnectionCleanup(device) {
@@ -588,7 +725,7 @@
 			return !this.destroyed && generation === this.generation;
 		}
 
-		_awaitOperation(operation, timeoutMs, timeoutMessage) {
+		_awaitOperation(operation, timeoutMs, timeoutMessage, reason) {
 			return new Promise((resolve, reject) => {
 				let settled = false;
 				let timeout = null;
@@ -597,6 +734,9 @@
 					settled = true;
 					if (timeout !== null) this.options.clearTimeout(timeout);
 					this.pendingOperations.delete(cancel);
+					if (callback === reject && reason && value && typeof value === 'object' && !value.haloReason && value.name !== 'AbortError') {
+						try { value.haloReason = reason; } catch (error) { /* Frozen errors keep the generic reason. */ }
+					}
 					callback(value);
 				};
 				const cancel = (reason) => {
@@ -684,7 +824,7 @@
 			const payload = generateWakePing();
 			let lastError = null;
 			try {
-				const writers = ['writeValueWithResponse', 'writeValue', 'writeValueWithoutResponse'];
+				const writers = this._writeMethods(characteristic);
 				for (const method of writers) {
 					if (typeof characteristic[method] !== 'function') continue;
 					try {
@@ -708,7 +848,7 @@
 			const payload = generateLegacyProbe();
 			let lastError = null;
 			try {
-				for (const method of ['writeValueWithResponse', 'writeValue', 'writeValueWithoutResponse']) {
+				for (const method of this._writeMethods(characteristic)) {
 					if (typeof characteristic[method] !== 'function') continue;
 					try {
 						await this._writeWithTimeout(characteristic, method, payload);
@@ -722,6 +862,17 @@
 			} finally {
 				this.pingInFlight = false;
 			}
+		}
+
+		/* Honour the characteristic's declared write properties where the browser
+		 * exposes them: a write-without-response-only channel must not begin with
+		 * an acknowledged write that the module will reject. */
+		_writeMethods(characteristic) {
+			const properties = characteristic && characteristic.properties ? characteristic.properties : null;
+			if (properties && properties.writeWithoutResponse && !properties.write) {
+				return ['writeValueWithoutResponse', 'writeValue', 'writeValueWithResponse'];
+			}
+			return ['writeValueWithResponse', 'writeValue', 'writeValueWithoutResponse'];
 		}
 
 		_writeWithTimeout(characteristic, method, payload) {
@@ -826,6 +977,10 @@
 		FALLBACK_SERVICE_UUID,
 		FALLBACK_NOTIFY_CHARACTERISTIC_UUID,
 		FALLBACK_WRITE_CHARACTERISTIC_UUID,
+		SECONDARY_SERVICE_UUID,
+		SECONDARY_NOTIFY_CHARACTERISTIC_UUID,
+		SECONDARY_WRITE_CHARACTERISTIC_UUID,
+		OPTIONAL_SERVICE_UUIDS,
 		LEGACY_FRAME_BYTES,
 		crc16Modbus,
 		generateWakePing,

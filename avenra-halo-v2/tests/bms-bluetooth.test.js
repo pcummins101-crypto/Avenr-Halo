@@ -10,6 +10,8 @@ const {
 	FALLBACK_SERVICE_UUID,
 	FALLBACK_NOTIFY_CHARACTERISTIC_UUID,
 	FALLBACK_WRITE_CHARACTERISTIC_UUID,
+	SECONDARY_SERVICE_UUID,
+	OPTIONAL_SERVICE_UUIDS,
 	LEGACY_FRAME_BYTES,
 	crc16Modbus,
 	generateWakePing,
@@ -370,8 +372,8 @@ test('connects only on request, advertises both services and probes both protoco
 	assert.equal(status.connected, true);
 	assert.equal(status.live, false, 'GATT alone is never reported as live telemetry');
 	assert.deepEqual(runtime.calls[0], ['request', {
-		filters: [{ services: [SERVICE_UUID] }, { services: [FALLBACK_SERVICE_UUID] }],
-		optionalServices: [SERVICE_UUID, FALLBACK_SERVICE_UUID]
+		acceptAllDevices: true,
+		optionalServices: [SERVICE_UUID, FALLBACK_SERVICE_UUID, SECONDARY_SERVICE_UUID, ...OPTIONAL_SERVICE_UUIDS.filter((uuid) => ![SERVICE_UUID, FALLBACK_SERVICE_UUID, SECONDARY_SERVICE_UUID].includes(uuid))]
 	}]);
 	assert.deepEqual(runtime.calls.slice(1), [['connect'], ['service', SERVICE_UUID], ['characteristic', CHARACTERISTIC_UUID]]);
 	assert.equal(runtime.characteristic.started, 1);
@@ -670,4 +672,123 @@ test('unsupported and insecure runtimes fail truthfully without opening a choose
 	assert.equal(status.status, 'unavailable');
 	assert.equal(status.reason, 'insecure-context');
 	assert.equal(calls, 0);
+});
+
+function makeAutoDiscoveryBluetooth(options) {
+	const settings = Object.assign({ mode: 'unknown-service' }, options || {});
+	const calls = [];
+	const device = new FakeEventTarget();
+	device.name = 'BLE module';
+	const notFound = (message) => { const error = new Error(message); error.name = 'NotFoundError'; return error; };
+	const rx = new FakeCharacteristic();
+	rx.uuid = '0000fee2-0000-1000-8000-00805f9b34fb';
+	rx.properties = { notify: true, write: false, writeWithoutResponse: false };
+	const tx = new FakeCharacteristic();
+	tx.uuid = '0000fee3-0000-1000-8000-00805f9b34fb';
+	tx.properties = { notify: false, write: false, writeWithoutResponse: true };
+	const ecu = new FakeCharacteristic();
+	ecu.uuid = '0000ffec-0000-1000-8000-00805f9b34fb';
+	ecu.properties = { notify: true, write: true, writeWithoutResponse: true };
+	const generic = { uuid: '00001800-0000-1000-8000-00805f9b34fb', async getCharacteristics() { calls.push(['characteristics', this.uuid]); return []; } };
+	const services = settings.mode === 'ecu'
+		? [generic, { uuid: SERVICE_UUID, async getCharacteristics() { calls.push(['characteristics', this.uuid]); return [ecu]; } }]
+		: [generic, { uuid: '0000fee7-0000-1000-8000-00805f9b34fb', async getCharacteristics() { calls.push(['characteristics', this.uuid]); return [rx, tx]; } }];
+	const server = {
+		async getPrimaryService(uuid) {
+			calls.push(['service', uuid]);
+			if (settings.mode === 'ecu' && uuid === SERVICE_UUID) {
+				return { async getCharacteristic(characteristicUuid) { calls.push(['characteristic', characteristicUuid]); throw notFound('only FFEC here'); } };
+			}
+			throw notFound('service unavailable');
+		},
+		async getPrimaryServices() { calls.push(['services']); return services; }
+	};
+	device.gatt = {
+		connected: false,
+		async connect() { calls.push(['connect']); this.connected = true; return server; },
+		disconnect() { this.connected = false; device.emit('gattserverdisconnected', { type: 'gattserverdisconnected', target: device }); }
+	};
+	return { bluetooth: { async requestDevice(request) { calls.push(['request', request]); return device; } }, device, rx, tx, calls };
+}
+
+test('falls back to characteristic auto-discovery when no known BMS service is present', async () => {
+	const runtime = makeAutoDiscoveryBluetooth();
+	const { manager, telemetry } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'waiting-for-data');
+	assert.equal(status.connected, true);
+	assert.equal(status.transport, 'auto');
+	assert.ok(runtime.calls.some((call) => call[0] === 'services'), 'the permitted service list is inspected');
+	assert.ok(!runtime.calls.some((call) => call[0] === 'characteristics' && call[1].startsWith('00001800')), 'generic GATT services are skipped');
+	assert.equal(runtime.rx.started, 1, 'notifications start on the notify-capable characteristic');
+	assert.equal(runtime.tx.writes.length, 2, 'both read-only probes go to the write-capable characteristic');
+	assert.equal(runtime.tx.writes[0].method, 'without-response', 'a write-without-response-only channel is honoured');
+	assert.equal(Buffer.from(runtime.tx.writes[0].value).toString('hex'), '7ea1010000c899b3aa55');
+	assert.equal(Buffer.from(runtime.tx.writes[1].value).toString('hex'), 'dbdb00000000');
+	runtime.rx.notify(makeFrame());
+	assert.equal(manager.getStatus().status, 'live');
+	assert.equal(telemetry.length, 1);
+});
+
+test('tells the rider when the HyperCore ECU was chosen instead of the BMS', async () => {
+	const runtime = makeAutoDiscoveryBluetooth({ mode: 'ecu' });
+	const { manager, statuses } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'error');
+	assert.equal(status.reason, 'ecu-selected');
+	assert.match(status.lastError, /HyperCore ECU, not the HyperCore BMS/);
+	assert.equal(runtime.device.gatt.connected, false, 'the wrong module is released');
+	assert.equal(statuses[statuses.length - 1].reason, 'ecu-selected');
+});
+
+test('reports a connection that never opened as a connect failure, not a generic error', async () => {
+	const runtime = makeBluetooth();
+	runtime.device.gatt.connect = async () => { const error = new Error('GATT connect failed'); error.name = 'NetworkError'; throw error; };
+	const { manager } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'error');
+	assert.equal(status.reason, 'connect-failed');
+});
+
+test('a notify-only FFE1 with a sibling write channel is paired through auto-discovery', async () => {
+	const calls = [];
+	const device = new FakeEventTarget();
+	device.name = 'BMS module';
+	const ffe1 = new FakeCharacteristic();
+	ffe1.uuid = CHARACTERISTIC_UUID;
+	ffe1.properties = { notify: true, write: false, writeWithoutResponse: false };
+	const ffe2 = new FakeCharacteristic();
+	ffe2.uuid = '0000ffe2-0000-1000-8000-00805f9b34fb';
+	ffe2.properties = { notify: false, write: true, writeWithoutResponse: true };
+	const ffe0 = {
+		uuid: SERVICE_UUID,
+		async getCharacteristic(uuid) {
+			calls.push(['characteristic', uuid]);
+			if (uuid === CHARACTERISTIC_UUID) return ffe1;
+			const error = new Error('missing'); error.name = 'NotFoundError'; throw error;
+		},
+		async getCharacteristics() { return [ffe1, ffe2]; }
+	};
+	const server = {
+		async getPrimaryService(uuid) {
+			calls.push(['service', uuid]);
+			if (uuid === SERVICE_UUID) return ffe0;
+			const error = new Error('missing'); error.name = 'NotFoundError'; throw error;
+		},
+		async getPrimaryServices() { calls.push(['services']); return [ffe0]; }
+	};
+	device.gatt = {
+		connected: false,
+		async connect() { this.connected = true; return server; },
+		disconnect() { this.connected = false; }
+	};
+	const runtime = { bluetooth: { async requestDevice() { return device; } }, device };
+	const { manager } = makeManager(runtime);
+	const status = await manager.connect();
+	assert.equal(status.status, 'waiting-for-data');
+	assert.equal(status.transport, 'auto');
+	assert.equal(ffe1.started, 1);
+	assert.equal(ffe1.writes.length, 0, 'nothing is written to a notify-only channel');
+	assert.equal(ffe2.writes.length, 2);
+	assert.equal(ffe2.writes[0].method, 'with-response', 'a channel that supports acknowledged writes keeps them');
 });

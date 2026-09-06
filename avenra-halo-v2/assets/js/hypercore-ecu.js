@@ -12,6 +12,7 @@
 
 	const SERVICE_UUID = '0000ffe0-0000-1000-8000-00805f9b34fb';
 	const CHARACTERISTIC_UUID = '0000ffec-0000-1000-8000-00805f9b34fb';
+	const BMS_CHARACTERISTIC_UUID = '0000ffe1-0000-1000-8000-00805f9b34fb';
 	const FRAME_BYTES = 16;
 	const CRC_INITIAL_VALUE = 0x7f3c;
 	const MAX_BUFFER_BYTES = 4096;
@@ -717,11 +718,29 @@
 					this.options.discoveryTimeoutMs,
 					'The HyperCore ECU service was not found in time.'
 				);
-				const characteristic = await this._awaitOperation(
-					Promise.resolve(service.getCharacteristic(this.options.characteristicUuid)),
-					this.options.discoveryTimeoutMs,
-					'The HyperCore ECU data channel was not found in time.'
-				);
+				let characteristic = null;
+				try {
+					characteristic = await this._awaitOperation(
+						Promise.resolve(service.getCharacteristic(this.options.characteristicUuid)),
+						this.options.discoveryTimeoutMs,
+						'The HyperCore ECU data channel was not found in time.'
+					);
+				} catch (error) {
+					if (!this._isCurrent(generation)) throw error;
+					// The BMS module shares the FFE0 service but carries FFE1 instead of
+					// FFEC. Tell the rider they chose the wrong module rather than
+					// reporting a generic link failure.
+					let bmsChannel = null;
+					try { bmsChannel = await service.getCharacteristic(BMS_CHARACTERISTIC_UUID); } catch (probeError) { bmsChannel = null; }
+					if (bmsChannel) {
+						const wrongDevice = new Error('The selected Bluetooth device is the HyperCore BMS, not the HyperCore ECU.');
+						wrongDevice.name = 'NotSupportedError';
+						wrongDevice.haloReason = 'bms-selected';
+						throw wrongDevice;
+					}
+					if (error && typeof error === 'object' && !error.haloReason) error.haloReason = 'transport-missing';
+					throw error;
+				}
 				if (!this._isCurrent(generation)) return this._lateConnectionCleanup(device);
 				this.characteristic = characteristic;
 				characteristic.addEventListener?.('characteristicvaluechanged', this.boundValueChanged);
@@ -746,7 +765,7 @@
 				// peripheral and silently reuse it on the next rider attempt.
 				await this._cleanupConnection(true, false);
 				return this._setStatus(cancelled ? 'idle' : 'error', {
-					reason: cancelled ? 'selection-cancelled' : 'connection-failed',
+					reason: cancelled ? 'selection-cancelled' : (error && error.haloReason) || 'connection-failed',
 					error: cancelled ? null : error
 				});
 			}

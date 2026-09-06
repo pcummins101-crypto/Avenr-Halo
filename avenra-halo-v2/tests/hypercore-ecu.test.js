@@ -113,6 +113,12 @@ function makeBluetooth(characteristic, options) {
 			return {
 				async getCharacteristic(characteristicUuid) {
 					calls.push(['characteristic', characteristicUuid]);
+					if (settings.bmsModule) {
+						if (characteristicUuid === '0000ffe1-0000-1000-8000-00805f9b34fb') return new FakeCharacteristic();
+						const error = new Error('FFEC unavailable');
+						error.name = 'NotFoundError';
+						throw error;
+					}
 					if (settings.characteristicError) throw settings.characteristicError;
 					return channel;
 				}
@@ -383,6 +389,17 @@ test('rejects a wrong-role FFE0 device before writing and reopens the chooser', 
 	status = await manager.connect({ forceChooser: true });
 	assert.equal(status.status, 'error');
 	assert.equal(runtime.calls.filter(([kind]) => kind === 'request').length, 2);
+});
+
+test('tells the rider when the HyperCore BMS was chosen instead of the ECU', async () => {
+	const runtime = makeBluetooth(new FakeCharacteristic(), { bmsModule: true });
+	const { manager } = makeManager(runtime);
+	const status = await manager.connect({ forceChooser: true });
+	assert.equal(status.status, 'error');
+	assert.equal(status.reason, 'bms-selected');
+	assert.match(status.lastError, /HyperCore BMS, not the HyperCore ECU/);
+	assert.equal(runtime.characteristic.writes.length, 0);
+	assert.equal(manager.device, null, 'the wrong peripheral must not remain pinned');
 });
 
 test('reconnect reuses the selected device and never reopens the chooser', async () => {

@@ -3083,21 +3083,42 @@
 			if (status === 'connecting' || status === 'reconnecting') return { title: 'HyperCore ECU', badge: status === 'reconnecting' ? 'Reconnecting' : 'Connecting', badgeClass: '', copy: 'Halo is opening the ECU data link.' };
 			if (status === 'waiting-for-data') return { title: 'HyperCore ECU', badge: 'Connected', badgeClass: '', copy: 'The link is open. Halo will mark the ECU live after its first valid update.' };
 			if (status === 'stale') return { title: 'HyperCore ECU', badge: 'Delayed', badgeClass: 'halo-badge--attention', copy: 'The ECU signal is delayed. Values below are the last reading, not current data.' };
-			if (status === 'error') return { title: 'HyperCore ECU', badge: 'Check', badgeClass: 'halo-badge--attention', copy: 'Halo could not open the ECU data link. Check that Bluetooth and the motorcycle are switched on, then try again.' };
+			if (status === 'error') return { title: 'HyperCore ECU', badge: 'Check', badgeClass: 'halo-badge--attention', copy: this.ecuErrorCopy(ecu.reason) };
 			if (status === 'unavailable') return { title: 'HyperCore ECU', badge: 'Unavailable', badgeClass: 'halo-badge--attention', copy: ecu.reason === 'insecure-context' ? 'For security, ECU pairing requires Halo to be opened over HTTPS.' : 'This phone or app build does not expose the Bluetooth data access required by HyperCore ECU.' };
 			if (status === 'disconnected') return { title: 'HyperCore ECU', badge: 'Offline', badgeClass: 'halo-badge--attention', copy: 'The ECU link ended. Values below are the last reading; pair again while safely parked to restore live data.' };
 			return { title: 'HyperCore ECU', badge: 'Not connected', badgeClass: '', copy: ecu.reason === 'selection-cancelled' ? 'No ECU was selected. Pair again whenever you are ready.' : 'Pair HyperCore ECU to show motor speed, drive current, temperatures and input state.' };
+		}
+
+		/* Turn the driver's failure reason into an instruction the rider can act on.
+		 * A wrong module, a link that never opened and a data stream that never
+		 * started need different fixes, so they must not share one message. */
+		bmsErrorCopy(reason) {
+			switch (String(reason || '')) {
+				case 'ecu-selected': return 'That device is the HyperCore ECU, not the BMS. Pair again and choose the battery module.';
+				case 'transport-missing': return 'The device you chose does not provide BMS data. Pair again and choose the HyperCore BMS module.';
+				case 'connect-failed': return 'The BMS did not answer the Bluetooth connection. Move the phone next to the motorcycle, close any other app connected to the BMS, then try again.';
+				case 'notifications-failed': return 'The BMS link opened but its data stream did not start. Switch the motorcycle off and on again, then pair again.';
+				default: return 'Halo could not open the BMS data link. Check that Bluetooth and the motorcycle are switched on, then try again.';
+			}
+		}
+
+		ecuErrorCopy(reason) {
+			switch (String(reason || '')) {
+				case 'bms-selected': return 'That device is the HyperCore BMS, not the ECU. Pair again and choose the drive-system module.';
+				case 'transport-missing': return 'The device you chose does not provide ECU data. Pair again and choose the HyperCore ECU module.';
+				default: return 'Halo could not open the ECU data link. Check that Bluetooth and the motorcycle are switched on, then try again.';
+			}
 		}
 
 		bmsPresentation() {
 			const bms = this.state.bms || {};
 			const status = text(bms.status, bms.supported ? 'idle' : 'unavailable');
 			if (status === 'live') return { title: 'HyperCore BMS', badge: 'Live', badgeClass: 'halo-badge--good', copy: 'Halo is receiving live energy-system data from your motorcycle.' };
-			if (status === 'scanning') return { title: 'HyperCore BMS', badge: 'Scanning', badgeClass: '', copy: 'Choose the HyperCore BMS in your phone’s Bluetooth window.' };
+			if (status === 'scanning') return { title: 'HyperCore BMS', badge: 'Scanning', badgeClass: '', copy: 'Choose the HyperCore BMS in your phone’s Bluetooth window. Every nearby Bluetooth device is listed: pick the battery module, not the ECU.' };
 			if (status === 'connecting') return { title: 'HyperCore BMS', badge: 'Connecting', badgeClass: '', copy: 'Halo is opening the BMS data link.' };
 			if (status === 'waiting-for-data') return { title: 'HyperCore BMS', badge: 'Connected', badgeClass: '', copy: 'The link is open. Halo will mark the BMS live after its first valid update.' };
 			if (status === 'stale') return { title: 'HyperCore BMS', badge: 'Delayed', badgeClass: 'halo-badge--attention', copy: 'The BMS signal is delayed. Values below are the last reading, not current data.' };
-			if (status === 'error') return { title: 'HyperCore BMS', badge: 'Check', badgeClass: 'halo-badge--attention', copy: 'Halo could not open the BMS data link. Check that Bluetooth and the motorcycle are switched on, then try again.' };
+			if (status === 'error') return { title: 'HyperCore BMS', badge: 'Check', badgeClass: 'halo-badge--attention', copy: this.bmsErrorCopy(bms.reason) };
 			if (status === 'unavailable') return { title: 'HyperCore BMS', badge: 'Unavailable', badgeClass: 'halo-badge--attention', copy: bms.reason === 'insecure-context' ? 'For security, BMS pairing requires Halo to be opened over HTTPS.' : 'This phone or app build does not expose the Bluetooth data access required by HyperCore BMS. You can still enter starting charge manually before a ride.' };
 			if (status === 'disconnected') return { title: 'HyperCore BMS', badge: 'Offline', badgeClass: 'halo-badge--attention', copy: 'The BMS link ended. Values below are the last reading; pair again while safely parked to restore live data.' };
 			return { title: 'HyperCore BMS', badge: 'Not connected', badgeClass: '', copy: bms.reason === 'selection-cancelled' ? 'No BMS was selected. Pair again whenever you are ready.' : 'Pair HyperCore BMS to show live charge, pack voltage, current, cell balance and temperature.' };
@@ -3329,7 +3350,7 @@
 			finally { this.endHypercorePairingAllowance(pairingToken); }
 			if (!status.connected) this.state.ecuVehicleId = null;
 			if (status.reason === 'selection-cancelled') this.toast('No HyperCore ECU selected.', 'success');
-			else if (status.status === 'error') this.toast('Halo could not connect to HyperCore ECU. Check Bluetooth and try again.', 'error');
+			else if (status.status === 'error') this.toast(this.ecuErrorCopy(status.reason), 'error');
 			else if (status.connected && !status.live) this.toast('HyperCore ECU connected. Waiting for live data.', 'success');
 		}
 
@@ -3356,7 +3377,7 @@
 			finally { this.endHypercorePairingAllowance(pairingToken); }
 			if (!status.connected) this.state.bmsVehicleId = null;
 			if (status.reason === 'selection-cancelled') this.toast('No HyperCore BMS selected.', 'success');
-			else if (status.status === 'error') this.toast('Halo could not connect to HyperCore BMS. Check Bluetooth and try again.', 'error');
+			else if (status.status === 'error') this.toast(this.bmsErrorCopy(status.reason), 'error');
 			else if (status.connected && !status.live) this.toast('HyperCore BMS connected. Waiting for live data.', 'success');
 		}
 

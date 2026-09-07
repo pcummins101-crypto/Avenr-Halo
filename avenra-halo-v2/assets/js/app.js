@@ -3568,6 +3568,9 @@
 				$$('[data-battery-range-basis]', root).forEach((element) => { element.textContent = rangeBasis; });
 				$$('[data-ride-range]', root).forEach((element) => { element.textContent = rangeLabel; });
 				$$('[data-dash-soc]', root).forEach((element) => { element.textContent = this.state.bms?.live && battery.soc !== null ? `${Math.round(battery.soc)}%` : '—'; });
+				const livePower = this.state.bms?.live && battery.powerKw !== null ? `${formatNumber(Math.abs(battery.powerKw), { maximumFractionDigits: 1 })} kW` : '—';
+				$$('[data-ride-power]', root).forEach((element) => { element.textContent = livePower; });
+				this.bindRideOverlayMetrics();
 				$$('[data-dash-range]', root).forEach((element) => { element.textContent = rangeLabel; });
 			}
 			this.renderHypercoreRideStatus();
@@ -6245,7 +6248,26 @@
 			}
 		}
 
+		/* The floating data panel changes height with its contents (a BMS adds a
+		 * row, short screens drop one). Everything stacked above it is placed
+		 * from its measured height so nothing can slide behind it. */
+		bindRideOverlayMetrics() {
+			const overlay = $('.halo-ride-data-overlay', root);
+			const ride = this.dom.activeRide;
+			if (!overlay || !ride) return;
+			const apply = () => {
+				const height = Math.round(overlay.getBoundingClientRect().height);
+				if (height > 0) ride.style.setProperty('--halo-ride-overlay-height', `${height}px`);
+			};
+			apply();
+			if (overlay.dataset.measured) return;
+			overlay.dataset.measured = 'true';
+			if (typeof window.ResizeObserver === 'function') new window.ResizeObserver(apply).observe(overlay);
+			else window.addEventListener('resize', apply);
+		}
+
 		bindHoldControl() {
+			this.bindRideOverlayMetrics();
 			const button = $('[data-action="hold-end-ride"]', root);
 			if (!button || button.dataset.bound) return;
 			button.dataset.bound = 'true';

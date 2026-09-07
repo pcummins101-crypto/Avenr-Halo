@@ -320,9 +320,10 @@ $halo_v2_profile_mark_default = esc_url( (string) ( $halo_v2_config['profileMark
 				<div><small>Trip</small><strong data-ride-distance>0.0 mi</strong></div>
 				<div><small>Time</small><strong data-ride-duration>00:00</strong></div>
 				<div><small>Top</small><strong data-ride-top-speed>0 mph</strong></div>
+				<div><small>Best 0–60</small><strong data-ride-zero-sixty>—</strong></div>
 				<div><small>Lean L</small><strong data-ride-lean-left>0°</strong></div>
 				<div><small>Lean R</small><strong data-ride-lean-right>0°</strong></div>
-				<div><small>Best 0–60</small><strong data-ride-zero-sixty>—</strong></div>
+				<div><small>Power</small><strong data-ride-power>—</strong></div>
 				<div><small>Max power</small><strong data-ride-max-power>—</strong></div>
 			</div>
 			<div class="halo-ride-hud">

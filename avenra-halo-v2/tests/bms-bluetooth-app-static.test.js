@@ -125,3 +125,19 @@ test('the ride view offers a one-tap BMS reconnect, a dash display and a hold co
 	assert.match(app, /'avenra-halo-v2-ride-view'/);
 	assert.match(app, /\[data-battery-range\]/, 'range surfaces update with live charge');
 });
+
+test('the map controls and speed disc are placed from the data panel’s measured height', () => {
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'halo-v2.css'), 'utf8');
+	const app = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+	const shell = fs.readFileSync(path.join(__dirname, '..', 'templates', 'app-shell.php'), 'utf8');
+	assert.doesNotMatch(css, /\.halo-speed-card \{[^}]*bottom: calc\(var\(--halo-safe-bottom\) \+ 242px\)/, 'no fixed offset that a taller panel can cover');
+	assert.match(css, /\.halo-active-map-controls \{[^}]*var\(--halo-ride-overlay-height/);
+	assert.match(css, /\.halo-speed-card \{[^}]*var\(--halo-ride-overlay-height/);
+	assert.match(app, /setProperty\('--halo-ride-overlay-height'/);
+	assert.match(app, /ResizeObserver/);
+	assert.match(css, /\.halo-ride-performance \{[^}]*repeat\(4, minmax\(0,1fr\)\)/);
+	assert.equal((shell.match(/class="halo-ride-performance"[\s\S]*?<\/div>\s*<div class="halo-ride-hud">/)[0].match(/<div><small>/g) || []).length, 8, 'eight tiles fill two rows of four');
+	assert.match(shell, /data-ride-power/);
+});

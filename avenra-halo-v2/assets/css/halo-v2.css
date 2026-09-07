@@ -1725,14 +1725,14 @@ html.halo-ride-focus body { overscroll-behavior: none; }
 .halo-incident-camera-status.is-secured::before { background: #50d890; box-shadow: 0 0 0 3px rgba(80,216,144,.16); }
 .halo-test-ride-status.is-live::before { background: #50d890; box-shadow: 0 0 0 3px rgba(80,216,144,.16); }
 .halo-bms-ride-status.is-live::before { background: #50d890; box-shadow: 0 0 0 3px rgba(80,216,144,.16); }
-.halo-speed-card { position: absolute; left: calc(var(--halo-safe-left) + 12px); bottom: calc(var(--halo-safe-bottom) + 242px); z-index: 18; display: grid; place-items: center; align-content: center; width: 76px; height: 76px; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; color: #fff; background: rgba(10,14,18,.86); box-shadow: 0 8px 25px rgba(0,0,0,.28); backdrop-filter: blur(16px); }
+.halo-speed-card { position: absolute; left: calc(var(--halo-safe-left) + 12px); bottom: calc(var(--halo-safe-bottom) + 98px + var(--halo-ride-overlay-height, 156px)); z-index: 18; display: grid; place-items: center; align-content: center; width: 76px; height: 76px; border: 1px solid rgba(255,255,255,.2); border-radius: 50%; color: #fff; background: rgba(10,14,18,.86); box-shadow: 0 8px 25px rgba(0,0,0,.28); backdrop-filter: blur(16px); }
 .halo-speed-card strong { font-variant-numeric: tabular-nums; font-size: 31px; font-weight: 650; line-height: .95; letter-spacing: -.055em; }
 .halo-speed-card span { margin-top: 4px; color: rgba(255,255,255,.62); font-size: 9px; font-weight: 680; letter-spacing: .08em; text-transform: uppercase; }
-.halo-active-map-controls { position: absolute; right: calc(var(--halo-safe-right) + 12px); bottom: calc(var(--halo-safe-bottom) + 242px); z-index: 18; display: grid; gap: 8px; }
+.halo-active-map-controls { position: absolute; right: calc(var(--halo-safe-right) + 12px); bottom: calc(var(--halo-safe-bottom) + 98px + var(--halo-ride-overlay-height, 156px)); z-index: 18; display: grid; gap: 8px; }
 .halo-active-map-controls button { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid rgba(255,255,255,.16); border-radius: 50%; color: #fff; background: rgba(18,22,26,.88); box-shadow: 0 5px 18px rgba(0,0,0,.22); cursor: pointer; }
 .halo-active-map-controls button.is-active { border-color: rgba(255,255,255,.82); color: #101316; background: rgba(255,255,255,.96); }
 .halo-ride-data-overlay { position: absolute; right: calc(var(--halo-safe-right) + 10px); bottom: calc(var(--halo-safe-bottom) + 86px); left: calc(var(--halo-safe-left) + 10px); z-index: 24; overflow: hidden; border: 1px solid rgba(255,255,255,.13); border-radius: 19px; background: rgba(10,14,18,.79); box-shadow: 0 12px 36px rgba(0,0,0,.32); backdrop-filter: blur(18px) saturate(1.08); }
-.halo-ride-performance { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 1px; background: rgba(255,255,255,.1); }
+.halo-ride-performance { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 1px; background: rgba(255,255,255,.1); }
 .halo-ride-performance > div { min-width: 0; padding: 7px 5px; background: rgba(10,14,18,.58); text-align: center; }
 .halo-ride-performance small { display: block; margin-bottom: 2px; color: rgba(255,255,255,.62); font-size: 10px; font-weight: 650; line-height: 1.15; letter-spacing: .06em; text-transform: uppercase; }
 .halo-ride-performance strong { display: block; overflow: hidden; font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 620; line-height: 1.15; text-overflow: ellipsis; white-space: nowrap; }
@@ -2327,14 +2327,14 @@ html.halo-ride-active .halo-toast-region { top: calc(var(--halo-safe-top) + 150p
 	.halo-ride-guidance h1 { font-size: 20px; }
 	.halo-manoeuvre { font-size: 40px; }
 	.halo-ride-data-overlay { bottom: calc(var(--halo-safe-bottom) + 72px); }
-	.halo-ride-performance > div:nth-child(n+4) { display: none; }
+	.halo-ride-performance > div:nth-child(n+5) { display: none; }
 	.halo-ride-performance > div { padding: 6px 4px; }
 	.halo-ride-hud > div { padding: 8px 6px; }
 	.halo-ride-controls { bottom: calc(var(--halo-safe-bottom) + 8px); grid-template-columns: 62px 62px minmax(0, 1fr); gap: 7px; }
 	.halo-ride-control,
 	.halo-hold-button { min-height: 56px; border-radius: 14px; }
 	.halo-speed-card,
-	.halo-active-map-controls { bottom: calc(var(--halo-safe-bottom) + 176px); }
+	.halo-active-map-controls { bottom: calc(var(--halo-safe-bottom) + 82px + var(--halo-ride-overlay-height, 104px)); }
 	.halo-active-map .halo-map__attribution,
 	.halo-active-map .halo-map__status,
 	.halo-ride-degraded { top: calc(var(--halo-safe-top) + 122px); }

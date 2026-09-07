@@ -986,3 +986,46 @@ test('a frame without the capacity block still decodes, reporting nothing it did
 	assert.equal(legacy.stateOfHealth, null);
 	assert.equal(legacy.reportedPowerKw, null);
 });
+
+test('reopens a link to the remembered module with one call and no chooser', async () => {
+	const runtime = makeBluetooth();
+	runtime.device.name = 'ANT@BLE24CBCB-2001';
+	const { manager } = makeManager(runtime);
+	await manager.connect();
+	const requests = () => runtime.calls.filter(([kind]) => kind === 'request').length;
+	const connects = () => runtime.calls.filter(([kind]) => kind === 'connect').length;
+	assert.equal(requests(), 1);
+	await manager.disconnect('document-hidden');
+	assert.equal(manager.getStatus().status, 'disconnected');
+	assert.equal(runtime.device.gatt.connected, false);
+
+	const status = await manager.reconnect();
+	assert.equal(requests(), 1, 'the chooser must not open again');
+	assert.equal(connects(), 2);
+	assert.equal(status.status, 'waiting-for-data');
+	assert.equal(status.connected, true);
+	assert.deepEqual(runtime.characteristic.writes.slice(-1).map((entry) => Buffer.from(entry.value).toString('hex')), ['7ea1010000be1855aa55']);
+	runtime.characteristic.notify(makeFrame({ socRaw: 80 }));
+	assert.equal(manager.getStatus().live, true);
+	await manager.destroy();
+});
+
+test('reconnect falls back to the browser’s permitted devices, then to the chooser', async () => {
+	const runtime = makeBluetooth();
+	runtime.device.name = 'ANT@BLE24CBCB-2001';
+	let listed = [runtime.device];
+	runtime.bluetooth.getDevices = async () => listed;
+	const { manager } = makeManager(runtime);
+	const status = await manager.reconnect();
+	assert.equal(status.connected, true);
+	assert.equal(runtime.calls.filter(([kind]) => kind === 'request').length, 0, 'a permitted ANT device needs no chooser');
+	await manager.destroy();
+
+	const fresh = makeBluetooth();
+	listed = [];
+	fresh.bluetooth.getDevices = async () => listed;
+	const second = makeManager(fresh).manager;
+	await second.reconnect();
+	assert.equal(fresh.calls.filter(([kind]) => kind === 'request').length, 1, 'with nothing remembered or permitted, the chooser opens');
+	await second.destroy();
+});

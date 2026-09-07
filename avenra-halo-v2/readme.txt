@@ -4,7 +4,7 @@ Tags: avenra, halo, motorcycle, pwa, customer-portal
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.8.0
+Stable tag: 2.8.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -105,6 +105,12 @@ Browser-private storage is origin/profile scoped, not application-encrypted stor
 Halo Community is disabled until a rider explicitly joins. Its public identity is limited to a rider-chosen username and optional bio; customer identity, motorcycles, rides, locations, Emergency Assist information and ride-risk indicators are not exposed through Community. Direct messages are stored by Halo and are not end-to-end encrypted. See `docs/COMMUNITY.md` before launch.
 
 == Changelog ==
+
+= 2.8.1 =
+* Fixed the home and vehicle range cards staying at their first value: every range surface now moves with the live charge reading.
+* Fixed Hold to end being taken as a text-selection long-press on Android; the control now refuses selection and the context menu.
+* Added a one-tap Reconnect BMS button to the ride map and dash, and Halo reopens the Avenrà BMS and ECU links automatically when the screen comes back mid-ride, without a chooser.
+* Added a simplified Dash ride view: instruction and distance large at the top, speed largest, then charge, range, max power and trip on black. The choice is remembered on the phone and Hazard, Share and Hold to end stay in place.
 
 = 2.8.0 =
 * Named the powertrain modules the way riders know them: Halo now says Avenrà BMS and Avenrà HyperCore ECU wherever it identifies the hardware. The phone's own Bluetooth chooser is drawn by the operating system and still shows the firmware name.

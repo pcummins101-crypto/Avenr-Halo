@@ -47,6 +47,21 @@ instruction instead of one generic message.
   `auto`) and a short code. Riders can quote this line when reporting a
   problem.
 
+### During a ride
+
+Locking the phone or leaving Halo drops both radio links for privacy. When the
+screen comes back mid-ride Halo reopens them to the modules already chosen,
+without a chooser, and the ride map and dash both carry a **Reconnect BMS**
+button for the rider to do the same by hand. Web Bluetooth allows a GATT
+connection to a previously chosen device without a new chooser; the chooser
+only opens when nothing is remembered, which needs the rider's tap.
+
+The ride map's **Dash** control switches to a simplified black display: the
+next instruction and its distance large at the top, speed largest, then charge,
+range, max power and trip. The choice is remembered on the phone. Hazard, Share
+and Hold to end stay in place on both views, and the hold control refuses text
+selection and the context menu so a two-second press can only end the ride.
+
 Ride start is disabled only while a chooser or connection is actively opening.
 Live, partial, delayed and unavailable telemetry never end an active ride. Halo
 disconnects both sessions when the page is hidden or unloaded, the rider signs

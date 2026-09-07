@@ -101,3 +101,27 @@ test('the HyperCore cards show the exact failure so a rider can report it', () =
 	assert.match(app, /case 'bms-selected': return 'That device is the HyperCore BMS, not the ECU/);
 	assert.match(app, /bms\.reason === 'no-telemetry'/);
 });
+
+test('the ride view offers a one-tap BMS reconnect, a dash display and a hold control that cannot select text', () => {
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const app = fs.readFileSync(path.join(__dirname, '..', 'assets', 'js', 'app.js'), 'utf8');
+	const shell = fs.readFileSync(path.join(__dirname, '..', 'templates', 'app-shell.php'), 'utf8');
+	const css = fs.readFileSync(path.join(__dirname, '..', 'assets', 'css', 'halo-v2.css'), 'utf8');
+	assert.match(app, /case 'reconnect-bms': await this\.reconnectBms\(target\)/);
+	assert.match(app, /async reconnectBms\(button, options\)/);
+	assert.match(app, /this\.bms\.reconnect\(\)/);
+	assert.match(app, /this\.state\.activeRide && this\.state\.bmsRideWasLive && !this\.state\.bms\?\.live\) this\.reconnectBms\(null, \{ silent: true \}\)/, 'the link is reopened automatically when the screen comes back mid-ride');
+	assert.match(app, /button\.addEventListener\('contextmenu', \(event\) => event\.preventDefault\(\)\)/);
+	assert.match(app, /button\.addEventListener\('selectstart', \(event\) => event\.preventDefault\(\)\)/);
+	assert.match(css, /\.halo-ride-controls, \.halo-ride-controls \* \{ user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;/);
+	assert.match(shell, /data-ride-dash/);
+	assert.match(shell, /data-dash-speed/);
+	assert.match(shell, /data-dash-soc/);
+	assert.match(shell, /data-dash-max-power/);
+	assert.match(shell, /data-dash-instruction/);
+	assert.match(shell, /data-action="toggle-ride-dash"/);
+	assert.equal((shell.match(/data-ride-reconnect-bms/g) || []).length, 2, 'reconnect is offered on both the map and the dash');
+	assert.match(app, /'avenra-halo-v2-ride-view'/);
+	assert.match(app, /\[data-battery-range\]/, 'range surfaces update with live charge');
+});

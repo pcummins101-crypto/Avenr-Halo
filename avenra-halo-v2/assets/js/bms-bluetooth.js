@@ -451,6 +451,7 @@
 			this.pendingOperations = new Set();
 			this.destroyed = false;
 			this.discoveryHint = '';
+			this.rememberedDevice = null;
 			this.protocolHint = null;
 			this.silentProbes = 0;
 			this.silentReconnects = 0;
@@ -1074,6 +1075,9 @@
 			this.decoder.reset();
 			const characteristic = this.notifyCharacteristic;
 			const device = this.device;
+			// Keep the rider's chosen module so a lost link can be reopened with
+			// one tap and no chooser. The reference is dropped on destroy().
+			if (device) this.rememberedDevice = device;
 			this.characteristic = null;
 			this.notifyCharacteristic = null;
 			this.writeCharacteristic = null;
@@ -1117,9 +1121,64 @@
 			return this._setStatus(reason === 'document-hidden' ? 'disconnected' : 'idle', { reason: reason || 'user-disconnected' });
 		}
 
+		/* Reopen the link to the module the rider already chose. Web Bluetooth
+		 * allows a GATT connection to a previously selected device without a new
+		 * chooser, so this works from a plain tap mid-ride. When no device is
+		 * remembered, the browser's list of already-permitted devices is tried,
+		 * and only then does the chooser open. */
+		async reconnect() {
+			if (this.destroyed) return this._setStatus('unavailable', { reason: 'destroyed' });
+			if (!this.supported) return this._setStatus('unavailable', { reason: this.options.secureContext ? 'unsupported' : 'insecure-context' });
+			if (this.connectPromise) return this.connectPromise;
+			if (this.connected && ['waiting-for-data', 'live', 'stale'].includes(this.status)) return this.getStatus();
+			let device = this.rememberedDevice || null;
+			if (!device && typeof this.options.bluetooth.getDevices === 'function') {
+				try {
+					const permitted = await this.options.bluetooth.getDevices();
+					device = (Array.isArray(permitted) ? permitted : []).find((candidate) => protocolHintFromName(candidate && candidate.name)) || null;
+				} catch (error) { device = null; }
+			}
+			if (!device) return this.connect();
+			const pending = this._reconnectKnownDevice(device);
+			const tracked = pending.finally(() => {
+				if (this.connectPromise === tracked) this.connectPromise = null;
+			});
+			this.connectPromise = tracked;
+			return tracked;
+		}
+
+		async _reconnectKnownDevice(device) {
+			this._clearPingTimer();
+			this._clearStaleTimer();
+			this.decoder.reset();
+			this.lastError = '';
+			this.telemetry = null;
+			this.lastTelemetryAt = 0;
+			this.protocol = null;
+			this.activeTransport = null;
+			this.discoveryHint = '';
+			const generation = ++this.generation;
+			this._setStatus('reconnecting', { reason: 'known-device' });
+			try {
+				this.device = device;
+				this.protocolHint = protocolHintFromName(device.name);
+				this.silentProbes = 0;
+				this.silentReconnects = 0;
+				device.addEventListener?.('gattserverdisconnected', this.boundDisconnected);
+				return await this._openLink(device, generation);
+			} catch (error) {
+				if (!this._isCurrent(generation)) return this.getStatus();
+				this.generation += 1;
+				this._cancelPendingOperations('connection-ended');
+				await this._cleanupConnection(true);
+				return this._setStatus('error', { reason: (error && error.haloReason) || 'connection-failed', error });
+			}
+		}
+
 		async destroy() {
 			if (this.destroyed) return;
 			await this.disconnect('destroyed', { silent: true });
+			this.rememberedDevice = null;
 			this.destroyed = true;
 			this.listeners.clear();
 		}

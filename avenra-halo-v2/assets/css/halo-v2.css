@@ -1748,6 +1748,7 @@ html.halo-ride-focus body { overscroll-behavior: none; }
 }
 .halo-ride-controls { position: absolute; right: calc(var(--halo-safe-right) + 10px); bottom: calc(var(--halo-safe-bottom) + 10px); left: calc(var(--halo-safe-left) + 10px); z-index: 32; display: grid; grid-template-columns: 72px 72px minmax(0,1fr); align-items: center; gap: 9px; padding: 0; background: transparent; }
 .halo-ride-control { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 64px; border: 1px solid rgba(255,255,255,.17); border-radius: 16px; color: #fff; background: rgba(12,16,20,.87); box-shadow: 0 9px 28px rgba(0,0,0,.24); font-size: 10px; font-weight: 620; backdrop-filter: blur(16px); }
+.halo-ride-controls, .halo-ride-controls * { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: manipulation; }
 .halo-hold-button { position: relative; overflow: hidden; min-height: 64px; padding: 10px 18px; border: 1px solid rgba(255,255,255,.17); border-radius: 16px; color: #fff; background: rgba(12,16,20,.9); box-shadow: 0 9px 28px rgba(0,0,0,.24); cursor: pointer; backdrop-filter: blur(16px); }
 .halo-hold-button > span { position: absolute; inset: 0 auto 0 0; width: 0; background: rgba(207,46,46,.8); pointer-events: none; }
 .halo-hold-button strong { position: relative; z-index: 1; font-size: 14px; }
@@ -2379,4 +2380,39 @@ html.halo-ride-active .halo-toast-region { top: calc(var(--halo-safe-top) + 150p
 	.halo-toast-region { display: none !important; }
 	.halo-main { padding: 0; }
 	.halo-view { padding: 20px; }
+}
+
+
+/* Ride view: reconnect pill and the simplified dash. */
+.halo-ride-reconnect { display: inline-flex; align-items: center; gap: 8px; width: max-content; max-width: 100%; min-height: 40px; padding: 8px 14px; border: 1px solid rgba(114,168,255,.55); border-radius: 12px; color: #fff; background: rgba(16,44,86,.94); box-shadow: 0 5px 18px rgba(0,0,0,.24); font-size: 12px; font-weight: 680; cursor: pointer; pointer-events: auto; backdrop-filter: blur(12px); }
+.halo-ride-reconnect .halo-icon { width: 18px; height: 18px; }
+.halo-ride-reconnect[hidden] { display: none; }
+.halo-active-map-controls button.halo-map-control-text span { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.halo-ride-dash { position: absolute; inset: 0; z-index: 31; display: flex; flex-direction: column; justify-content: space-between; gap: 12px; padding: calc(var(--halo-safe-top) + 16px) calc(var(--halo-safe-right) + 18px) calc(var(--halo-safe-bottom) + 92px) calc(var(--halo-safe-left) + 18px); color: #fff; background: #000; }
+.halo-ride-dash[hidden] { display: none; }
+.halo-ride-dash-guidance { display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 16px; min-height: 108px; }
+.halo-dash-manoeuvre { font-size: 60px; line-height: 1; text-align: center; color: #72a8ff; }
+.halo-ride-dash-guidance p { margin: 0 0 4px; color: #72a8ff; font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.halo-ride-dash-guidance h2 { display: -webkit-box; overflow: hidden; margin: 0; font-size: clamp(26px, 7vw, 38px); line-height: 1.1; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.halo-ride-dash-speed { text-align: center; }
+.halo-ride-dash-speed strong { display: block; font-size: clamp(128px, 40vw, 220px); font-weight: 700; line-height: .9; letter-spacing: -.06em; font-variant-numeric: tabular-nums; }
+.halo-ride-dash-speed span { display: block; margin-top: 10px; color: rgba(255,255,255,.6); font-size: 20px; font-weight: 680; letter-spacing: .16em; text-transform: uppercase; }
+.halo-ride-dash-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.halo-ride-dash-metrics > div { padding: 12px 4px; border: 1px solid rgba(255,255,255,.14); border-radius: 14px; text-align: center; }
+.halo-ride-dash-metrics small { display: block; margin-bottom: 4px; color: rgba(255,255,255,.55); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; }
+.halo-ride-dash-metrics strong { font-size: 22px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.halo-ride-dash-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px; }
+.halo-ride-dash-status { flex: 1 1 100%; margin: 0; color: rgba(255,255,255,.55); font-size: 13px; font-weight: 620; text-align: center; }
+.halo-ride-dash-status.is-live { color: #7fe0a4; }
+.halo-ride-dash-status:empty { display: none; }
+.halo-ride-dash-button { min-height: 46px; padding: 0 20px; border: 1px solid rgba(255,255,255,.28); border-radius: 23px; color: #fff; background: rgba(255,255,255,.09); font-size: 14px; font-weight: 680; cursor: pointer; }
+.halo-ride-dash-button[data-action="reconnect-bms"] { border-color: rgba(114,168,255,.6); background: rgba(16,44,86,.9); }
+.halo-ride-dash-button[hidden] { display: none; }
+@media (orientation: landscape) and (max-height: 520px) {
+	.halo-ride-dash { flex-direction: row; flex-wrap: wrap; align-content: center; gap: 8px 20px; }
+	.halo-ride-dash-guidance { flex: 1 1 100%; min-height: 0; }
+	.halo-ride-dash-speed { flex: 1 1 40%; }
+	.halo-ride-dash-speed strong { font-size: clamp(88px, 24vh, 140px); }
+	.halo-ride-dash-metrics { flex: 1 1 50%; }
+	.halo-ride-dash-actions { flex: 1 1 100%; }
 }

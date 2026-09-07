@@ -1139,6 +1139,10 @@
 				}
 				this.hypercoreHiddenDuringPairing = false;
 				if (!this.state.boot) return;
+						// Locking the screen dropped the radio links for privacy. Mid-ride,
+						// reopen them to the modules already chosen without asking again.
+						if (this.state.activeRide && this.state.bmsRideWasLive && !this.state.bms?.live) this.reconnectBms(null, { silent: true }).catch(() => null);
+						if (this.state.activeRide && this.state.ecuRideWasLive && !this.state.ecu?.live) this.ecu?.reconnect?.().catch?.(() => null);
 						if (this.rideMemorySession) this.refreshRideMemoryLease().catch(() => null);
 						if (!this.state.activeRide) this.refreshVehicleStatus();
 						if (!this.state.boot?.offline_snapshot) this.reconcileStoredEmergency().catch(() => null);
@@ -2480,6 +2484,8 @@
 					case 'camera-alignment-switch': await this.switchCameraAlignment(target.dataset.cameraRole); break;
 					case 'ride-recenter': await this.recenterRideMap(); break;
 					case 'ride-overview': await this.overviewRideMap(); break;
+					case 'toggle-ride-dash': this.toggleRideView(); break;
+					case 'reconnect-bms': await this.reconnectBms(target); break;
 					case 'share-live-location': await this.shareLiveLocation(target); break;
 					case 'reshare-live-location': await this.reshareLiveLocation(target); break;
 					case 'stop-live-location': await this.stopLiveTracking(true, target); break;
@@ -3532,8 +3538,14 @@
 					power: this.telemetryNumberLabel(bmsTelemetry.powerKw, ' kW', { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
 					'cell-spread': this.telemetryNumberLabel(bmsTelemetry.cellDeltaMv, ' mV', { maximumFractionDigits: 0 }),
 					temperature: this.telemetryNumberLabel(bmsTelemetry.maxTemperature, '°C', { maximumFractionDigits: 0 }),
-					updated: bmsTelemetry.measuredAt ? formatDate(bmsTelemetry.measuredAt, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'
+					updated: bmsTelemetry.measuredAt ? formatDate(bmsTelemetry.measuredAt, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—',
+					range: formatMiles(this.batteryRangeMiles(), true),
+					energy: (finite(bmsTelemetry.remainingWh) ?? 0) > 0 ? `${formatNumber(bmsTelemetry.remainingWh / 1000, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kWh` : '—'
 				};
+				const rideEnergy = this.rideEnergySummary();
+				if (rideEnergy?.peakPowerKw !== null && rideEnergy?.peakPowerKw !== undefined) {
+					metricValues['peak-power'] = `${formatNumber(rideEnergy.peakPowerKw, { maximumFractionDigits: 1 })} kW · ${formatNumber(rideEnergy.peakBhp, { maximumFractionDigits: 0 })} bhp`;
+				}
 				Object.entries(metricValues).forEach(([metric, value]) => {
 					$$(`[data-bms-metric="${metric}"]`, root).forEach((element) => { element.textContent = value; });
 				});
@@ -3547,6 +3559,16 @@
 				});
 				const rideCharge = $('[data-ride-bms-charge]', root);
 				if (rideCharge) rideCharge.textContent = this.state.bms?.live && battery.soc !== null ? `${Math.round(battery.soc)}%` : '—';
+				// Range is derived from the same live reading, so every surface that
+				// shows it moves with the charge figure rather than waiting for a
+				// full re-render.
+				const rangeLabel = formatMiles(this.batteryRangeMiles(), true);
+				const rangeBasis = battery.timeToFull || this.rangeBasisLabel(this.batteryRangeEstimate().basis);
+				$$('[data-battery-range]', root).forEach((element) => { element.textContent = rangeLabel; });
+				$$('[data-battery-range-basis]', root).forEach((element) => { element.textContent = rangeBasis; });
+				$$('[data-ride-range]', root).forEach((element) => { element.textContent = rangeLabel; });
+				$$('[data-dash-soc]', root).forEach((element) => { element.textContent = this.state.bms?.live && battery.soc !== null ? `${Math.round(battery.soc)}%` : '—'; });
+				$$('[data-dash-range]', root).forEach((element) => { element.textContent = rangeLabel; });
 			}
 			this.renderHypercoreRideStatus();
 		}
@@ -3571,6 +3593,17 @@
 			const waiting = Boolean(this.state.activeRide && [ecu, bms].some((component) => component.connected && ['connecting', 'reconnecting', 'waiting-for-data', 'stale'].includes(component.status)));
 			const lost = Boolean(this.state.activeRide && ((this.state.ecuRideWasLive && !ecu.live) || (this.state.bmsRideWasLive && !bms.live)));
 			chip.hidden = !this.state.activeRide || (!bothLive && !oneLive && !waiting && !lost);
+			const bmsBusy = ['scanning', 'connecting', 'reconnecting'].includes(String(bms.status || ''));
+			const offerReconnect = Boolean(this.state.activeRide && bms.supported && !bms.live && !bmsBusy);
+			$$('[data-ride-reconnect-bms]', root).forEach((button) => {
+				button.hidden = !offerReconnect;
+				button.disabled = bmsBusy;
+			});
+			const dashStatus = $('[data-dash-bms-status]', root);
+			if (dashStatus) {
+				dashStatus.textContent = bms.live ? 'Avenrà BMS live' : bmsBusy ? 'Reconnecting Avenrà BMS…' : this.state.bmsRideWasLive ? 'Avenrà BMS link lost' : (bms.supported ? 'Avenrà BMS not connected' : '');
+				dashStatus.classList.toggle('is-live', Boolean(bms.live));
+			}
 			if (chip.hidden) return;
 			chip.classList.toggle('is-live', bothLive);
 			chip.classList.toggle('is-warning', !bothLive);
@@ -3614,6 +3647,66 @@
 			this.state.ecuVehicleId = null;
 			if (!this.state.activeRide) this.state.ecuRideWasLive = false;
 			this.toast('HyperCore ECU disconnected.', 'success');
+		}
+
+		/* One tap, no chooser, allowed mid-ride: the module was chosen while
+		 * parked and only the radio link needs reopening. The chooser opens only
+		 * when nothing is remembered, and that still needs this tap's gesture. */
+		async reconnectBms(button, options) {
+			const settings = Object.assign({ silent: false }, options || {});
+			if (!this.bms?.supported) {
+				if (!settings.silent) this.toast(this.bmsPresentation().copy, 'error');
+				return null;
+			}
+			if (this.state.bms?.live || ['scanning', 'connecting', 'reconnecting'].includes(String(this.state.bms?.status || ''))) return this.state.bms;
+			if (this.state.vehicle?.id) this.state.bmsVehicleId = String(this.state.vehicle.id);
+			this.setLoading(button, true);
+			let status = null;
+			try {
+				status = await this.bms.reconnect();
+			} catch (error) {
+				if (!settings.silent) this.toast('Halo could not reopen the Avenrà BMS link. Try again, or pair again while safely parked.', 'error');
+				return null;
+			} finally {
+				this.setLoading(button, false);
+			}
+			if (!settings.silent) {
+				if (status?.reason === 'selection-cancelled') this.toast('No Avenrà BMS selected.', 'success');
+				else if (status?.status === 'error') this.toast(this.bmsErrorCopy(status.reason), 'error');
+				else if (status?.connected) this.toast('Avenrà BMS link reopened.', 'success');
+			}
+			this.renderHypercoreRideStatus();
+			return status;
+		}
+
+		storedRideView() {
+			try { return window.localStorage.getItem('avenra-halo-v2-ride-view') === 'dash' ? 'dash' : 'map'; } catch (error) { return 'map'; }
+		}
+
+		applyRideView(view) {
+			const dash = $('[data-ride-dash]', root);
+			if (!dash) return;
+			const useDash = view === 'dash';
+			dash.hidden = !useDash;
+			$$('[data-action="toggle-ride-dash"]', root).forEach((button) => {
+				button.setAttribute('aria-pressed', useDash ? 'true' : 'false');
+				button.setAttribute('aria-label', useDash ? 'Switch to map view' : 'Switch to dash view');
+			});
+			this.state.rideView = useDash ? 'dash' : 'map';
+			if (useDash) {
+				// Seed the dash from whatever is already known so it never opens blank.
+				this.updateRideTelemetry({});
+				this.updateHypercoreSurfaces({ renderSummary: false, renderEcuCard: false, renderBmsCard: false, updateEcuMetrics: false, updateBmsMetrics: false, updateBatterySurfaces: true });
+			}
+		}
+
+		toggleRideView() {
+			const next = this.state.rideView === 'dash' ? 'map' : 'dash';
+			try { window.localStorage.setItem('avenra-halo-v2-ride-view', next); } catch (error) { /* Preference is a convenience only. */ }
+			this.applyRideView(next);
+			if (next === 'map') {
+				window.requestAnimationFrame(() => this.maps.call('active', ['invalidate', 'invalidateSize', 'resize'], []).catch(() => null));
+			}
 		}
 
 		async connectBms() {
@@ -3724,7 +3817,7 @@
 					imageAlt: [this.vehicleName(), colourLabel].filter(Boolean).join(' — ')
 				});
 				html += `<div class="halo-metric-grid">
-					<div class="halo-metric">${icon('battery')}<small>Estimated range</small><strong>${formatMiles(this.batteryRangeMiles(), true)}</strong><span>${escapeHTML(battery.timeToFull || this.rangeBasisLabel(this.batteryRangeEstimate().basis))}</span></div>
+					<div class="halo-metric">${icon('battery')}<small>Estimated range</small><strong data-battery-range>${formatMiles(this.batteryRangeMiles(), true)}</strong><span data-battery-range-basis>${escapeHTML(battery.timeToFull || this.rangeBasisLabel(this.batteryRangeEstimate().basis))}</span></div>
 					<div class="halo-metric">${icon('lock')}<small>Security</small><strong>${escapeHTML(secureLabel)}</strong><span>${security.last_updated ? `Updated ${escapeHTML(formatDate(security.last_updated, { hour: '2-digit', minute: '2-digit' }))}` : 'Tap for controls'}</span></div>
 					<div class="halo-metric">${icon('activity')}<small>Odometer</small><strong>${formatMiles(vehicle.odometer_miles ?? vehicle.current_mileage, true)}</strong><span>${vehicle.odometer_miles == null && vehicle.current_mileage == null ? 'Awaiting vehicle data' : 'Recorded distance'}</span></div>
 					<div class="halo-metric">${icon('service')}<small>Service</small><strong>${escapeHTML(vehicle.service?.status_label || vehicle.service?.status || 'No update')}</strong><span>${vehicle.service?.due_date ? `Due ${formatDate(vehicle.service.due_date)}` : 'View maintenance'}</span></div>
@@ -3794,7 +3887,7 @@
 					<section class="halo-card halo-hypercore-component halo-ecu-card" data-ecu-card>${this.ecuCardContentHTML()}</section>
 					<section class="halo-card halo-hypercore-component halo-bms-card" data-bms-card>${this.bmsCardContentHTML()}</section>
 				</div>
-				<section class="halo-card"><div class="halo-card-header"><div><p class="halo-card-kicker">RANGE</p><h2>Journey estimate</h2></div><span class="halo-badge">Estimate</span></div><dl class="halo-spec-list"><div class="halo-spec-row"><dt>Estimated range</dt><dd>${escapeHTML(formatMiles(this.batteryRangeMiles(), true))}</dd></div>${this.rangeDetailRows()}<div class="halo-spec-row"><dt>Starting charge for Ride mode</dt><dd data-bms-effective-start-charge>${escapeHTML(this.startingChargeLabel())}</dd></div></dl><p class="halo-helper">${escapeHTML(this.rangeBasisLabel(this.batteryRangeEstimate().basis))}. HyperCore BMS reports battery measurements, not dependable remaining mileage. Halo keeps range clearly labelled as an estimate.</p></section>`;
+				<section class="halo-card"><div class="halo-card-header"><div><p class="halo-card-kicker">RANGE</p><h2>Journey estimate</h2></div><span class="halo-badge">Estimate</span></div><dl class="halo-spec-list"><div class="halo-spec-row"><dt>Estimated range</dt><dd data-battery-range>${escapeHTML(formatMiles(this.batteryRangeMiles(), true))}</dd></div>${this.rangeDetailRows()}<div class="halo-spec-row"><dt>Starting charge for Ride mode</dt><dd data-bms-effective-start-charge>${escapeHTML(this.startingChargeLabel())}</dd></div></dl><p class="halo-helper">${escapeHTML(this.rangeBasisLabel(this.batteryRangeEstimate().basis))}. HyperCore BMS reports battery measurements, not dependable remaining mileage. Halo keeps range clearly labelled as an estimate.</p></section>`;
 		}
 
 		renderVehicleBuild(container) {
@@ -6080,6 +6173,13 @@
 				this.renderRideDegradedState();
 				$('[data-next-instruction]', root).textContent = route ? 'Route guidance ready' : 'Free ride recording';
 				$('[data-next-distance]', root).textContent = route ? 'Starting' : 'No destination';
+				const dashInstruction = $('[data-dash-instruction]', root);
+				if (dashInstruction) dashInstruction.textContent = route ? 'Route guidance ready' : 'Free ride';
+				const dashDistance = $('[data-dash-distance]', root);
+				if (dashDistance) dashDistance.textContent = route ? 'Starting' : '';
+				const dashManoeuvre = $('[data-dash-manoeuvre]', root);
+				if (dashManoeuvre) dashManoeuvre.textContent = '↑';
+				this.applyRideView(this.storedRideView());
 				this.updateRideTelemetry({ speedMph: 0, distanceMiles: 0, durationSeconds: 0, topSpeedMph: 0, maxLeanLeft: 0, maxLeanRight: 0, bestZeroToSixty: null, range_miles: this.vehicleBattery().range });
 				this.state.rideReturnFocus = rideReturnFocus;
 				this.dom.product.setAttribute('inert', '');
@@ -6161,7 +6261,15 @@
 				button.classList.add('is-holding');
 				timer = window.setTimeout(() => { cancel(); this.endRide(); }, 2000);
 			};
-			button.addEventListener('pointerdown', start);
+			// A two-second press is exactly what Android treats as a long-press for
+			// text selection. Refuse the context menu and any selection on this
+			// control so the hold can only ever mean "end the ride".
+			button.addEventListener('contextmenu', (event) => event.preventDefault());
+			button.addEventListener('selectstart', (event) => event.preventDefault());
+			button.addEventListener('touchstart', (event) => { if (event.cancelable) event.preventDefault(); if (!timer) start(event); }, { passive: false });
+			button.addEventListener('touchend', cancel);
+			button.addEventListener('touchcancel', cancel);
+			button.addEventListener('pointerdown', (event) => { if (event.pointerType !== 'touch') start(event); });
 			button.addEventListener('pointerup', cancel);
 			button.addEventListener('pointercancel', cancel);
 			button.addEventListener('pointerleave', cancel);
@@ -6178,11 +6286,21 @@
 			const distance = $('[data-next-distance]', root);
 			const nextInstruction = text(guidance.instruction || guidance.next_instruction, 'Continue on route');
 			if (instruction && instruction.textContent !== nextInstruction) instruction.textContent = nextInstruction;
+			const dashInstruction = $('[data-dash-instruction]', root);
+			if (dashInstruction && dashInstruction.textContent !== nextInstruction) dashInstruction.textContent = nextInstruction;
 			if (distance) {
 				const metres = finite(guidance.distance_metres);
-				distance.textContent = text(guidance.distance_label, metres === null ? '—' : metres >= 1000 ? `${(metres / 1609.344).toFixed(1)} mi` : `${Math.round(metres)} m`);
+				const distanceLabel = text(guidance.distance_label, metres === null ? '—' : metres >= 1000 ? `${(metres / 1609.344).toFixed(1)} mi` : `${Math.round(metres)} m`);
+				distance.textContent = distanceLabel;
+				const dashDistance = $('[data-dash-distance]', root);
+				if (dashDistance) dashDistance.textContent = distanceLabel;
 			}
-			if (guidance.manoeuvre) $('.halo-manoeuvre', root).textContent = text(guidance.manoeuvre_symbol, '↑');
+			if (guidance.manoeuvre) {
+				const symbol = text(guidance.manoeuvre_symbol, '↑');
+				$('.halo-manoeuvre', root).textContent = symbol;
+				const dashManoeuvre = $('[data-dash-manoeuvre]', root);
+				if (dashManoeuvre) dashManoeuvre.textContent = symbol;
+			}
 			const arrival = $('[data-ride-arrival]', root);
 			if (arrival && Object.prototype.hasOwnProperty.call(guidance, 'eta')) {
 				arrival.textContent = guidance.eta ? formatDate(guidance.eta, { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -6320,11 +6438,18 @@
 			if (maxLeanRight) maxLeanRight.textContent = `${Math.abs(Math.round(leanRight || 0))}°`;
 			if (bestZeroToSixty) bestZeroToSixty.textContent = zeroToSixty === null || zeroToSixty <= 0 ? '—' : `${zeroToSixty.toFixed(2)} s`;
 			if (range) range.textContent = formatMiles(telemetry.range_miles ?? this.batteryRangeMiles(), true);
+			const energy = this.rideEnergySummary();
+			const powerLabel = energy?.peakPowerKw === null || !energy ? '—' : `${formatNumber(energy.peakPowerKw, { maximumFractionDigits: 1 })} kW`;
 			const power = $('[data-ride-max-power]', root);
-			if (power) {
-				const energy = this.rideEnergySummary();
-				power.textContent = energy?.peakPowerKw === null || !energy ? '—' : `${formatNumber(energy.peakPowerKw, { maximumFractionDigits: 1 })} kW`;
-			}
+			if (power) power.textContent = powerLabel;
+			const dashSpeed = $('[data-dash-speed]', root);
+			if (dashSpeed) dashSpeed.textContent = speedMph === null ? '0' : String(Math.max(0, Math.round(speedMph)));
+			const dashTrip = $('[data-dash-trip]', root);
+			if (dashTrip) dashTrip.textContent = distanceMiles === null ? '0.0 mi' : `${distanceMiles.toFixed(1)} mi`;
+			const dashPower = $('[data-dash-max-power]', root);
+			if (dashPower) dashPower.textContent = powerLabel;
+			const dashRange = $('[data-dash-range]', root);
+			if (dashRange) dashRange.textContent = formatMiles(telemetry.range_miles ?? this.batteryRangeMiles(), true);
 			this.captureRideMemoryTelemetry(telemetry);
 			/* Arrival, GPS and map position have dedicated event owners. Generic
 			 * telemetry arrives every 100 ms and must update the HUD only. */

@@ -306,11 +306,13 @@ $halo_v2_profile_mark_default = esc_url( (string) ( $halo_v2_config['profileMark
 					<div class="halo-hypercore-ride-status halo-bms-ride-status" data-bms-ride-status role="status" aria-live="polite" hidden>HyperCore data starting…</div>
 					<div class="halo-ride-memory-status" data-ride-memory-status role="status" aria-live="polite" hidden>Ride Memories starting · audio off</div>
 					<div class="halo-incident-camera-status" data-incident-camera-status role="status" aria-live="polite" hidden>Incident camera starting · audio off</div>
+					<button type="button" class="halo-ride-reconnect" data-action="reconnect-bms" data-ride-reconnect-bms hidden><svg class="halo-icon" aria-hidden="true"><use href="#halo-icon-battery"></use></svg><span>Reconnect BMS</span></button>
 				</div>
 			<div class="halo-speed-card" aria-label="Current speed"><strong data-ride-speed>0</strong><span>mph</span></div>
 			<div class="halo-active-map-controls" role="group" aria-label="Map view controls">
 				<button type="button" data-action="ride-overview" aria-label="Show route overview"><svg class="halo-icon"><use href="#halo-icon-route"></use></svg></button>
 				<button type="button" data-action="ride-recenter" aria-label="Following my location" aria-pressed="true" class="is-active"><svg class="halo-icon"><use href="#halo-icon-pin"></use></svg></button>
+				<button type="button" data-action="toggle-ride-dash" aria-label="Switch to dash view" aria-pressed="false" class="halo-map-control-text"><span>Dash</span></button>
 			</div>
 		</div>
 		<div class="halo-ride-data-overlay">
@@ -330,6 +332,24 @@ $halo_v2_profile_mark_default = esc_url( (string) ( $halo_v2_config['profileMark
 				<div><small>GPS</small><strong data-ride-gps>Finding</strong></div>
 			</div>
 		</div>
+		<section class="halo-ride-dash" data-ride-dash aria-label="Simplified ride display" hidden>
+			<div class="halo-ride-dash-guidance">
+				<div class="halo-dash-manoeuvre" data-dash-manoeuvre aria-hidden="true">↑</div>
+				<div><p data-dash-distance>—</p><h2 data-dash-instruction aria-live="polite" aria-atomic="true">Route guidance</h2></div>
+			</div>
+			<div class="halo-ride-dash-speed" aria-label="Current speed"><strong data-dash-speed>0</strong><span>mph</span></div>
+			<div class="halo-ride-dash-metrics" aria-label="Ride figures">
+				<div><small>Charge</small><strong data-dash-soc>—</strong></div>
+				<div><small>Range</small><strong data-dash-range>—</strong></div>
+				<div><small>Max power</small><strong data-dash-max-power>—</strong></div>
+				<div><small>Trip</small><strong data-dash-trip>0.0 mi</strong></div>
+			</div>
+			<div class="halo-ride-dash-actions">
+				<p class="halo-ride-dash-status" data-dash-bms-status role="status" aria-live="polite"></p>
+				<button type="button" class="halo-ride-dash-button" data-action="reconnect-bms" data-ride-reconnect-bms hidden>Reconnect BMS</button>
+				<button type="button" class="halo-ride-dash-button" data-action="toggle-ride-dash" aria-label="Switch to map view" aria-pressed="true">Map view</button>
+			</div>
+		</section>
 		<div class="halo-ride-controls">
 			<button type="button" class="halo-ride-control" data-action="report-hazard"><svg class="halo-icon"><use href="#halo-icon-warning"></use></svg><span>Hazard</span></button>
 			<button type="button" class="halo-ride-control" data-action="share-live-location"><svg class="halo-icon"><use href="#halo-icon-route"></use></svg><span>Share</span></button>

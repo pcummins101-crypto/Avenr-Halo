@@ -4,7 +4,7 @@ Tags: avenra, halo, motorcycle, pwa, customer-portal
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.8.2
+Stable tag: 2.8.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -105,6 +105,9 @@ Browser-private storage is origin/profile scoped, not application-encrypted stor
 Halo Community is disabled until a rider explicitly joins. Its public identity is limited to a rider-chosen username and optional bio; customer identity, motorcycles, rides, locations, Emergency Assist information and ride-risk indicators are not exposed through Community. Direct messages are stored by Halo and are not end-to-end encrypted. See `docs/COMMUNITY.md` before launch.
 
 == Changelog ==
+
+= 2.8.3 =
+* Replaced the Home Screen icon, Apple touch icon and installation splash artwork with the Avenrà Halo wordmark on the app's own background, with a separate padded set for launchers that crop icons to a circle, so the splash and icon no longer show the old image.
 
 = 2.8.2 =
 * Fixed the ride map's speed disc, route, location and Dash controls sitting behind the floating data panel once it gained a row: they are now placed from the panel's measured height.

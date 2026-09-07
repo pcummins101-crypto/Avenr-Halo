@@ -372,7 +372,8 @@ final class Avenra_Halo_V2_Plugin {
 	public function manifest_link(): void {
 		if ( $this->is_app_page() ) {
 			echo '<link rel="manifest" href="' . esc_url( home_url( '/halo-v2-manifest.webmanifest?v=' . rawurlencode( AVENRA_HALO_V2_VERSION ) ) ) . '">' . "\n";
-			echo '<link rel="apple-touch-icon" href="' . esc_url( AVENRA_HALO_V2_URL . 'assets/images/halo-apple-touch.png' ) . '">' . "\n";
+			echo '<link rel="apple-touch-icon" sizes="180x180" href="' . esc_url( AVENRA_HALO_V2_URL . 'assets/images/halo-apple-touch.png?ver=' . rawurlencode( AVENRA_HALO_V2_VERSION ) ) . '">' . "\n";
+			echo '<link rel="icon" type="image/png" sizes="192x192" href="' . esc_url( AVENRA_HALO_V2_URL . 'assets/images/halo-icon-192.png?ver=' . rawurlencode( AVENRA_HALO_V2_VERSION ) ) . '">' . "\n";
 			echo '<meta name="theme-color" content="#f5f5f2">' . "\n";
 			echo '<meta name="mobile-web-app-capable" content="yes">' . "\n";
 			echo '<meta name="apple-mobile-web-app-capable" content="yes">' . "\n";
@@ -516,15 +517,28 @@ final class Avenra_Halo_V2_Plugin {
 	}
 
 	private function serve_manifest(): void {
+		// Two icon sets from the Avenrà Halo wordmark: a full-width one for
+		// ordinary use, and a padded one for launchers that crop icons to a
+		// circle or squircle. Sharing one image for both forces a compromise
+		// that looks wrong on one of them.
 		$icons = array();
-		foreach ( array( 192, 512 ) as $size ) {
+		foreach ( array( 192, 512, 1024 ) as $size ) {
 			$relative = 'assets/images/halo-icon-' . $size . '.png';
 			if ( file_exists( AVENRA_HALO_V2_DIR . $relative ) ) {
 				$icons[] = array(
-					'src'   => AVENRA_HALO_V2_URL . $relative,
-					'sizes' => $size . 'x' . $size,
-					'type'  => 'image/png',
-					'purpose' => 'any maskable',
+					'src'     => AVENRA_HALO_V2_URL . $relative,
+					'sizes'   => $size . 'x' . $size,
+					'type'    => 'image/png',
+					'purpose' => 'any',
+				);
+			}
+			$maskable = 'assets/images/halo-icon-maskable-' . $size . '.png';
+			if ( file_exists( AVENRA_HALO_V2_DIR . $maskable ) ) {
+				$icons[] = array(
+					'src'     => AVENRA_HALO_V2_URL . $maskable,
+					'sizes'   => $size . 'x' . $size,
+					'type'    => 'image/png',
+					'purpose' => 'maskable',
 				);
 			}
 		}
@@ -587,6 +601,9 @@ final class Avenra_Halo_V2_Plugin {
 			AVENRA_HALO_V2_URL . 'assets/js/app.js?ver=' . $version,
 			AVENRA_HALO_V2_URL . 'assets/images/halo-icon-192.png?ver=' . $version,
 			AVENRA_HALO_V2_URL . 'assets/images/halo-icon-512.png?ver=' . $version,
+			AVENRA_HALO_V2_URL . 'assets/images/halo-icon-maskable-192.png?ver=' . $version,
+			AVENRA_HALO_V2_URL . 'assets/images/halo-icon-maskable-512.png?ver=' . $version,
+			AVENRA_HALO_V2_URL . 'assets/images/halo-apple-touch.png?ver=' . $version,
 			esc_url_raw( (string) apply_filters( 'avenra_halo_v2_logo_white', AVENRA_HALO_V2_LOGO_WHITE ) ),
 			esc_url_raw( (string) apply_filters( 'avenra_halo_v2_logo_black', AVENRA_HALO_V2_LOGO_BLACK ) ),
 			esc_url_raw( (string) apply_filters( 'avenra_halo_v2_profile_mark_default', AVENRA_HALO_V2_PROFILE_MARK_DEFAULT ) ),

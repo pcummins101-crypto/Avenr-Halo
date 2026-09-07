@@ -97,6 +97,11 @@ final class Avenra_Halo_V2_Database {
 			duration_seconds int(10) unsigned NOT NULL DEFAULT 0,
 			distance_miles decimal(10,3) NOT NULL DEFAULT 0,
 			energy_wh decimal(12,2) DEFAULT NULL,
+			energy_recovered_wh decimal(12,2) DEFAULT NULL,
+			efficiency_wh_per_mile decimal(8,2) DEFAULT NULL,
+			peak_power_kw decimal(8,3) DEFAULT NULL,
+			peak_current_a decimal(8,2) DEFAULT NULL,
+			peak_voltage_v decimal(7,2) DEFAULT NULL,
 			average_speed_mph decimal(7,2) DEFAULT NULL,
 			top_speed_mph decimal(7,2) NOT NULL DEFAULT 0,
 			best_zero_to_sixty decimal(7,3) DEFAULT NULL,
@@ -602,7 +607,7 @@ final class Avenra_Halo_V2_Database {
 		$self->column_cache = array();
 		$required = array(
 			'sessions'          => array( 'id', 'customer_id', 'token_hash', 'csrf_hash', 'created_at', 'last_seen_at', 'expires_at', 'revoked_at', 'metadata_json' ),
-			'rides'             => array( 'id', 'public_id', 'customer_id', 'started_at', 'duration_seconds', 'distance_miles', 'top_speed_mph', 'route_json', 'telemetry_json', 'ride_mode', 'peak_g_force', 'harsh_event_count', 'telemetry_quality', 'status' ),
+			'rides'             => array( 'id', 'public_id', 'customer_id', 'started_at', 'duration_seconds', 'distance_miles', 'top_speed_mph', 'route_json', 'telemetry_json', 'ride_mode', 'peak_g_force', 'harsh_event_count', 'telemetry_quality', 'status', 'energy_recovered_wh', 'efficiency_wh_per_mile', 'peak_power_kw', 'peak_current_a', 'peak_voltage_v' ),
 			'hazards'           => array( 'id', 'public_id', 'customer_id', 'hazard_type', 'latitude', 'longitude', 'status', 'reported_at' ),
 			'live_tracking'     => array( 'id', 'public_id', 'customer_id', 'tracking_mode', 'auth_session_id', 'client_ride_id', 'arm_id', 'consent_version', 'consented_at', 'ended_reason', 'viewer_token_hash', 'writer_token_hash', 'guardian_enabled', 'guardian_token_hash', 'guardian_label', 'expires_at', 'ended_at', 'latitude', 'longitude', 'speed_mph', 'top_speed_mph', 'road_name', 'last_ping_at', 'recovery_request_id', 'recovery_request_count', 'recovery_requested_at', 'recovery_acknowledged_at', 'recovery_resumed_at', 'recovery_notification_attempted_at', 'recovery_notified_at' ),
 			'native_ride_sessions' => array( 'id', 'public_id', 'customer_id', 'auth_session_id', 'client_ride_id', 'token_hash', 'monitoring_enabled', 'started_at', 'expires_at', 'last_ping_at', 'last_recorded_at', 'last_sequence', 'latitude', 'longitude', 'altitude', 'accuracy_m', 'heading', 'speed_mph', 'device_id' ),

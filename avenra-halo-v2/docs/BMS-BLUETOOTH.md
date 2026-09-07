@@ -72,6 +72,52 @@ populate Halo's existing starting-charge field and can therefore be included in
 an ordinary ride or Emergency Assist record exactly like a manually entered
 charge value.
 
+## Figures Halo derives from the pack
+
+Halo names the modules as a rider knows them — **Avenrà BMS** and **Avenrà
+HyperCore ECU**. The phone's own Bluetooth chooser is drawn by the operating
+system and still shows the firmware's advertised name (it begins with `ANT`);
+no website can rename that dialog.
+
+### Estimated range
+
+Range is shown with the evidence it rests on, best first:
+
+| Basis | How it is worked out | When it is used |
+| --- | --- | --- |
+| Measured | Pack's remaining energy ÷ Wh per mile recorded this ride | From two miles into a ride with the BMS connected |
+| Pack | Remaining energy as a share of full capacity × the model's published range | BMS reports capacity, no consumption yet |
+| Charge | Published full-charge range × state of charge | BMS or vehicle record gives charge only |
+| Vehicle | The range already held on the Avenrà record | Nothing better is available |
+
+The published full-charge figures are **206 miles for EVO** and **103 miles for
+ONE**, set through `avenra_halo_v2_full_range_miles_evo` and
+`avenra_halo_v2_full_range_miles_one`. They are nominal manufacturer figures,
+not a promise of real-world range, and every result stays labelled an estimate.
+
+### Energy and consumption
+
+During a ride Halo accounts for energy two ways and prefers the first:
+
+1. The movement of the pack's own remaining energy, which does not depend on
+   any current-sign convention.
+2. An integration of pack power, for firmware that does not report capacity.
+   The discharge direction is confirmed by watching which sign of current
+   accompanies a falling pack, rather than being assumed; steps are capped at
+   30 seconds so a dropped link cannot invent energy.
+
+This fills the ride record's previously empty energy field and gives Wh per
+mile, energy recovered and state of charge used.
+
+### Recorded power
+
+Peak **drive** power is recorded while the motorcycle is moving, together with
+the current and pack voltage at that moment, and shown as kW, bhp and bhp per
+tonne. Power to weight uses the kerb weight from
+`avenra_halo_v2_kerb_weight_kg` (default 170 kg) and **excludes rider and
+luggage**. A ride made without the BMS connected records no power or energy
+figures at all rather than a zero that would read as a measurement.
+
 ## HyperCore ECU protocol
 
 - Primary service: `0000ffe0-0000-1000-8000-00805f9b34fb`

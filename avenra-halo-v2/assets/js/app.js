@@ -114,6 +114,15 @@
 		while (amount >= 1024 && index < units.length - 1) { amount /= 1024; index += 1; }
 		return `${new Intl.NumberFormat('en-GB', { maximumFractionDigits: amount >= 100 ? 0 : amount >= 10 ? 1 : 2 }).format(amount)} ${units[index]}`;
 	};
+	/* Named so it cannot shadow the browser's own performance global. The
+	 * fallback keeps rendering safe if the module ever fails to load: derived
+	 * figures are simply absent rather than throwing inside a view. */
+	const haloPerformance = window.AvenraHaloPerformance || {
+		KILOWATTS_TO_BHP: 1.34102209,
+		estimateRange: () => ({ miles: null, basis: 'vehicle' }),
+		efficiencyWhPerMile: () => null,
+		powerRecord: () => ({ kilowatts: null, bhp: null, bhpPerTonne: null })
+	};
 	const formatMiles = (value, compact) => {
 		const number = finite(value);
 		if (number === null) return '—';
@@ -775,6 +784,7 @@
 				bms: { status: 'unavailable', supported: false, connected: false, live: false, telemetry: null },
 				bmsVehicleId: null,
 				bmsRideWasLive: false,
+				rideEnergy: null,
 				testRideTracking: null,
 				rideReturnFocus: null,
 				community: {
@@ -1463,6 +1473,7 @@
 				this.state.bms = this.bms?.getStatus?.() || { status: 'unavailable', supported: false, connected: false, live: false, telemetry: null };
 				this.state.bmsVehicleId = null;
 				this.state.bmsRideWasLive = false;
+			this.state.rideEnergy = null;
 			}
 			this.state.vehicle = nextVehicle;
 			this.state.lifecycle = nextLifecycle;
@@ -1723,6 +1734,7 @@
 			this.state.bms = this.bms?.getStatus?.() || { status: 'unavailable', supported: false, connected: false, live: false, telemetry: null };
 			this.state.bmsVehicleId = null;
 			this.state.bmsRideWasLive = false;
+			this.state.rideEnergy = null;
 			this.resetCameraAlignmentViewed();
 			this.state.testRideTracking = null;
 			this.state.community = {
@@ -2860,6 +2872,35 @@
 			return text(vehicle.display_name || vehicle.name || vehicle.model, 'Your Avenrà');
 		}
 
+		/* EVO and ONE quote different full-charge ranges, so every derived figure
+		 * starts from the model actually linked to this account. */
+		/* Halo names the modules the way a rider knows them. The phone's own
+		 * Bluetooth chooser is drawn by the operating system and still shows the
+		 * firmware's advertised name, which no website can rename. */
+		hypercoreModuleName(module) {
+			return module === 'ecu' ? 'Avenrà HyperCore ECU' : 'Avenrà BMS';
+		}
+
+		vehicleModelKey(vehicle) {
+			const source = vehicle || this.state.vehicle || {};
+			const model = text(source.model || source.model_name || source.bike_model || source.display_name || source.name || source.product_name).toUpperCase();
+			if (/\bEVO\b/.test(model)) return 'evo';
+			if (/\bONE\b/.test(model)) return 'one';
+			return 'default';
+		}
+
+		performanceProfile() {
+			const configured = isObject(CONFIG.performance) ? CONFIG.performance : {};
+			const ranges = isObject(configured.fullRangeMiles) ? configured.fullRangeMiles : {};
+			const key = this.vehicleModelKey();
+			const fullRangeMiles = finite(ranges[key]);
+			return {
+				key,
+				fullRangeMiles: fullRangeMiles !== null && fullRangeMiles > 0 ? fullRangeMiles : null,
+				kerbWeightKg: finite(configured.kerbWeightKg) || 170
+			};
+		}
+
 		profileMarkForVehicle(vehicle) {
 			const marks = isObject(CONFIG.profileMarks) ? CONFIG.profileMarks : {};
 			const fallback = safeUrl(marks.default, ['https:']);
@@ -2907,8 +2948,68 @@
 				voltage: nullableFinite(liveBms.voltage),
 				current: nullableFinite(liveBms.current),
 				powerKw: nullableFinite(liveBms.powerKw),
-				maxTemperature: nullableFinite(liveBms.maxTemperature)
+				maxTemperature: nullableFinite(liveBms.maxTemperature),
+				remainingWh: nullableFinite(liveBms.remainingWh),
+				fullCapacityWh: nullableFinite(liveBms.fullCapacityWh),
+				remainingCapacityAh: nullableFinite(liveBms.remainingCapacityAh),
+				stateOfHealth: nullableFinite(liveBms.stateOfHealth)
 			};
+		}
+
+		/* Range, in order of how well it is evidenced:
+		 *   measured — the pack's own remaining energy divided by the Wh per mile
+		 *              this ride has actually used;
+		 *   pack     — remaining energy as a share of the pack's full capacity,
+		 *              applied to the model's quoted full-charge range;
+		 *   charge   — the model's quoted range scaled by state of charge;
+		 *   vehicle  — whatever the Avenrà record already held.
+		 * Every one of them is an estimate and is labelled as such. */
+		batteryRangeEstimate() {
+			const battery = this.vehicleBattery();
+			const profile = this.performanceProfile();
+			const full = profile.fullRangeMiles;
+			const efficiency = this.observedEfficiencyWhPerMile();
+			const estimate = haloPerformance.estimateRange({
+				remainingWh: battery.remainingWh,
+				fullCapacityWh: battery.fullCapacityWh,
+				soc: battery.soc,
+				fullRangeMiles: full,
+				efficiencyWhPerMile: efficiency,
+				vehicleRangeMiles: battery.range
+			});
+			return Object.assign({ efficiency }, estimate);
+		}
+
+		batteryRangeMiles() {
+			const estimate = this.batteryRangeEstimate();
+			return estimate.miles === null ? null : Math.round(estimate.miles * 10) / 10;
+		}
+
+		rangeDetailRows() {
+			const profile = this.performanceProfile();
+			const battery = this.vehicleBattery();
+			const efficiency = this.observedEfficiencyWhPerMile();
+			const rows = [];
+			if (profile.fullRangeMiles !== null) {
+				rows.push(`<div class="halo-spec-row"><dt>Quoted full-charge range</dt><dd>${escapeHTML(formatMiles(profile.fullRangeMiles, true))}</dd></div>`);
+			}
+			if ((battery.remainingWh ?? 0) > 0) {
+				rows.push(`<div class="halo-spec-row"><dt>Energy in the pack</dt><dd>${escapeHTML(formatNumber(battery.remainingWh / 1000, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))} kWh</dd></div>`);
+			}
+			if (efficiency !== null) {
+				rows.push(`<div class="halo-spec-row"><dt>Measured consumption</dt><dd>${escapeHTML(formatNumber(efficiency, { maximumFractionDigits: 0 }))} Wh per mile</dd></div>`);
+			}
+			if ((battery.stateOfHealth ?? 0) > 0) {
+				rows.push(`<div class="halo-spec-row"><dt>Pack health</dt><dd>${escapeHTML(formatNumber(battery.stateOfHealth, { maximumFractionDigits: 0 }))}%</dd></div>`);
+			}
+			return rows.join('');
+		}
+
+		rangeBasisLabel(basis) {
+			if (basis === 'measured') return 'From this ride\u2019s measured consumption';
+			if (basis === 'pack') return 'From the pack\u2019s remaining energy';
+			if (basis === 'charge') return 'From charge level and the quoted full-charge range';
+			return 'Based on current data';
 		}
 
 		syncRideSetup() {
@@ -3078,7 +3179,7 @@
 		ecuPresentation() {
 			const ecu = this.state.ecu || {};
 			const status = text(ecu.status, ecu.supported ? 'idle' : 'unavailable');
-			if (status === 'live') return { title: 'HyperCore ECU', badge: 'Live', badgeClass: 'halo-badge--good', copy: 'Halo is receiving live drive-system data from your motorcycle.' };
+			if (status === 'live') return { title: 'HyperCore ECU', badge: 'Live', badgeClass: 'halo-badge--good', copy: `Halo is receiving live drive-system data from ${this.hypercoreModuleName('ecu')} on your motorcycle.` };
 			if (status === 'scanning') return { title: 'HyperCore ECU', badge: 'Scanning', badgeClass: '', copy: 'Choose the HyperCore ECU in your phone’s Bluetooth window.' };
 			if (status === 'connecting' || status === 'reconnecting') return { title: 'HyperCore ECU', badge: status === 'reconnecting' ? 'Reconnecting' : 'Connecting', badgeClass: '', copy: 'Halo is opening the ECU data link.' };
 			if (status === 'waiting-for-data') return { title: 'HyperCore ECU', badge: 'Connected', badgeClass: '', copy: 'The link is open. Halo will mark the ECU live after its first valid update.' };
@@ -3125,11 +3226,29 @@
 			return `<p class="halo-helper halo-hypercore-details">Details: ${escapeHTML(parts.join(' · '))}</p>`;
 		}
 
+		/* Figures Halo derives from the pack's own readings rather than reading
+		 * them directly: estimated range, and the peak drive power of this ride. */
+		bmsDerivedMetricsMarkup(telemetry) {
+			const cells = [];
+			const range = this.batteryRangeMiles();
+			if (range !== null) {
+				cells.push(`<div><small>Estimated range</small><strong data-bms-metric="range">${escapeHTML(formatMiles(range, true))}</strong></div>`);
+			}
+			if ((finite(telemetry?.remainingWh) ?? 0) > 0) {
+				cells.push(`<div><small>Energy in pack</small><strong data-bms-metric="energy">${escapeHTML(formatNumber(telemetry.remainingWh / 1000, { minimumFractionDigits: 2, maximumFractionDigits: 2 }))} kWh</strong></div>`);
+			}
+			const energy = this.rideEnergySummary();
+			if (energy?.peakPowerKw !== null && energy?.peakPowerKw !== undefined) {
+				cells.push(`<div><small>Max power this ride</small><strong data-bms-metric="peak-power">${escapeHTML(`${formatNumber(energy.peakPowerKw, { maximumFractionDigits: 1 })} kW · ${formatNumber(energy.peakBhp, { maximumFractionDigits: 0 })} bhp`)}</strong></div>`);
+			}
+			return cells.join('');
+		}
+
 		bmsPresentation() {
 			const bms = this.state.bms || {};
 			const status = text(bms.status, bms.supported ? 'idle' : 'unavailable');
-			if (status === 'live') return { title: 'HyperCore BMS', badge: 'Live', badgeClass: 'halo-badge--good', copy: 'Halo is receiving live energy-system data from your motorcycle.' };
-			if (status === 'scanning') return { title: 'HyperCore BMS', badge: 'Scanning', badgeClass: '', copy: 'Choose the HyperCore BMS in your phone’s Bluetooth window. Every nearby Bluetooth device is listed: pick the battery module, not the ECU.' };
+			if (status === 'live') return { title: 'HyperCore BMS', badge: 'Live', badgeClass: 'halo-badge--good', copy: `Halo is receiving live energy-system data from ${this.hypercoreModuleName('bms')} on your motorcycle.` };
+			if (status === 'scanning') return { title: 'HyperCore BMS', badge: 'Scanning', badgeClass: '', copy: 'Choose the battery module in your phone’s Bluetooth window. Your phone lists the firmware name, which begins with ANT — Halo shows it as Avenrà BMS once connected.' };
 			if (status === 'connecting') return { title: 'HyperCore BMS', badge: 'Connecting', badgeClass: '', copy: 'Halo is opening the BMS data link.' };
 			if (status === 'waiting-for-data') return { title: 'HyperCore BMS', badge: 'Connected', badgeClass: '', copy: 'The link is open. Halo will mark the BMS live after its first valid update.' };
 			if (status === 'stale' && (bms.reason === 'no-telemetry' || !bms.telemetry)) return { title: 'HyperCore BMS', badge: 'No data', badgeClass: 'halo-badge--attention', copy: 'The BMS link is open but the BMS has not answered Halo’s read requests. If another app on this or another phone is connected to the BMS, close it, then disconnect and pair again.' };
@@ -3201,6 +3320,7 @@
 				<div><small>Cell spread</small><strong data-bms-metric="cell-spread">${this.telemetryNumberLabel(telemetry.cellDeltaMv, ' mV', { maximumFractionDigits: 0 })}</strong></div>
 				<div><small>Highest temperature</small><strong data-bms-metric="temperature">${this.telemetryNumberLabel(telemetry.maxTemperature, '°C', { maximumFractionDigits: 0 })}</strong></div>
 				<div><small>Last update</small><strong data-bms-metric="updated">${escapeHTML(telemetry.measuredAt ? formatDate(telemetry.measuredAt, { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—')}</strong></div>
+				${this.bmsDerivedMetricsMarkup(telemetry)}
 			</div>` : '';
 			const action = paired && hasDeliveredVehicle
 				? '<button type="button" class="halo-button halo-button--secondary halo-full-width" data-action="disconnect-bms">Disconnect HyperCore BMS</button>'
@@ -3240,8 +3360,126 @@
 		updateBmsTelemetry(telemetry) {
 			this.state.bms = Object.assign({}, this.state.bms || {}, { status: 'live', connected: true, live: true, telemetry });
 			if (this.state.activeRide) this.state.bmsRideWasLive = true;
+			this.trackRideEnergy(telemetry);
 			if (!this.state.activeRide) this.syncRideSetup();
 			this.updateBmsSurfaces({ renderCards: false });
+		}
+
+		emptyRideEnergy() {
+			return {
+				startedAt: Date.now(),
+				lastAt: null,
+				startRemainingWh: null,
+				lastRemainingWh: null,
+				capacityUsedWh: 0,
+				capacityRecoveredWh: 0,
+				integratedUsedWh: 0,
+				integratedRecoveredWh: 0,
+				// The pack reports a signed current. The vendor tooling treats a
+				// negative value as discharge, which is the assumption Halo starts
+				// from and then confirms against the pack's own remaining energy.
+				dischargeSign: -1,
+				dischargeSignConfirmed: false,
+				startSoc: null,
+				lastSoc: null,
+				peakPowerKw: 0,
+				peakCurrentA: 0,
+				peakVoltageV: null,
+				peakAt: null,
+				samples: 0
+			};
+		}
+
+		/* Fold one BMS reading into the ride's energy account. Two independent
+		 * measures are kept: the pack's own remaining-energy movement, which is
+		 * immune to any sign convention, and an integration of pack power, which
+		 * works on firmware that does not report capacity. */
+		trackRideEnergy(telemetry) {
+			if (!this.state.activeRide || !isObject(telemetry)) return;
+			const energy = this.state.rideEnergy || (this.state.rideEnergy = this.emptyRideEnergy());
+			const at = finite(telemetry.measuredAtMs) ?? Date.now();
+			const powerKw = finite(telemetry.powerKw);
+			const current = finite(telemetry.current);
+			const voltage = finite(telemetry.voltage);
+			const soc = finite(telemetry.soc);
+			const remainingWh = finite(telemetry.remainingWh);
+
+			if (remainingWh !== null) {
+				if (energy.startRemainingWh === null) energy.startRemainingWh = remainingWh;
+				if (energy.lastRemainingWh !== null) {
+					const delta = remainingWh - energy.lastRemainingWh;
+					if (delta < 0) energy.capacityUsedWh += -delta;
+					else if (delta > 0) energy.capacityRecoveredWh += delta;
+					// A falling pack while meaningful current flows identifies which
+					// sign of current is discharge on this unit.
+					if (!energy.dischargeSignConfirmed && delta < -0.5 && current !== null && Math.abs(current) >= 2) {
+						energy.dischargeSign = current < 0 ? -1 : 1;
+						energy.dischargeSignConfirmed = true;
+					}
+				}
+				energy.lastRemainingWh = remainingWh;
+			}
+
+			if (soc !== null) {
+				if (energy.startSoc === null) energy.startSoc = soc;
+				energy.lastSoc = soc;
+			}
+
+			if (energy.lastAt !== null && at > energy.lastAt && powerKw !== null) {
+				// Cap the step so a dropped Bluetooth link cannot invent energy.
+				const hours = Math.min(30, (at - energy.lastAt) / 1000) / 3600;
+				const wh = Math.abs(powerKw) * 1000 * hours;
+				const discharging = current === null ? powerKw < 0 : Math.sign(current) === energy.dischargeSign;
+				if (discharging) energy.integratedUsedWh += wh;
+				else energy.integratedRecoveredWh += wh;
+			}
+			energy.lastAt = at;
+
+			const speedMph = finite(this.state.lastTelemetry?.speedMph) ?? 0;
+			const drivePower = powerKw === null ? null : Math.abs(powerKw);
+			const driving = current === null ? true : Math.sign(current) === energy.dischargeSign;
+			// Only a genuine drive event counts as peak power, and only while the
+			// motorcycle is actually moving.
+			if (drivePower !== null && driving && speedMph >= 3 && drivePower > energy.peakPowerKw) {
+				energy.peakPowerKw = drivePower;
+				energy.peakCurrentA = current === null ? energy.peakCurrentA : Math.abs(current);
+				energy.peakVoltageV = voltage;
+				energy.peakAt = at;
+			}
+			energy.samples += 1;
+		}
+
+		rideEnergySummary() {
+			const energy = this.state.rideEnergy;
+			if (!energy || !energy.samples) return null;
+			const distance = finite(this.state.lastTelemetry?.distanceMiles) ?? 0;
+			const usedWh = energy.capacityUsedWh > 0 ? energy.capacityUsedWh : energy.integratedUsedWh;
+			const recoveredWh = energy.capacityUsedWh > 0 ? energy.capacityRecoveredWh : energy.integratedRecoveredWh;
+			const netWh = Math.max(0, usedWh - recoveredWh);
+			const profile = this.performanceProfile();
+			const record = haloPerformance.powerRecord(energy.peakPowerKw, profile.kerbWeightKg);
+			return {
+				energyWh: Math.round(netWh * 10) / 10,
+				energyUsedWh: Math.round(usedWh * 10) / 10,
+				energyRecoveredWh: Math.round(recoveredWh * 10) / 10,
+				distanceMiles: distance,
+				efficiencyWhPerMile: haloPerformance.efficiencyWhPerMile(netWh, distance, 1),
+				socUsed: energy.startSoc !== null && energy.lastSoc !== null ? Math.max(0, Math.round((energy.startSoc - energy.lastSoc) * 10) / 10) : null,
+				peakPowerKw: record.kilowatts,
+				peakCurrentA: energy.peakCurrentA > 0 ? Math.round(energy.peakCurrentA * 10) / 10 : null,
+				peakVoltageV: energy.peakVoltageV === null ? null : Math.round(energy.peakVoltageV * 10) / 10,
+				peakBhp: record.bhp,
+				peakBhpPerTonne: record.bhpPerTonne,
+				kerbWeightKg: profile.kerbWeightKg
+			};
+		}
+
+		/* Wh per mile actually used so far. Held back until the ride has covered
+		 * enough ground for the figure to mean anything. */
+		observedEfficiencyWhPerMile() {
+			const summary = this.rideEnergySummary();
+			if (!summary || summary.efficiencyWhPerMile === null) return null;
+			return summary.distanceMiles >= 2 && summary.efficiencyWhPerMile > 0 ? summary.efficiencyWhPerMile : null;
 		}
 
 		updateBmsSurfaces(options) {
@@ -3305,7 +3543,7 @@
 				$$('[data-battery-soc]', root).forEach((element) => { element.textContent = battery.soc === null ? '—' : `${Math.round(battery.soc)}%`; });
 				$$('[data-battery-status]', root).forEach((element) => {
 					if (element.closest('#halo-home-content')) element.textContent = battery.status || 'Battery';
-					else element.textContent = battery.soc === null ? 'Vehicle status' : `${formatMiles(battery.range, true)} estimated range`;
+					else element.textContent = battery.soc === null ? 'Vehicle status' : `${formatMiles(this.batteryRangeMiles(), true)} estimated range`;
 				});
 				const rideCharge = $('[data-ride-bms-charge]', root);
 				if (rideCharge) rideCharge.textContent = this.state.bms?.live && battery.soc !== null ? `${Math.round(battery.soc)}%` : '—';
@@ -3486,7 +3724,7 @@
 					imageAlt: [this.vehicleName(), colourLabel].filter(Boolean).join(' — ')
 				});
 				html += `<div class="halo-metric-grid">
-					<div class="halo-metric">${icon('battery')}<small>Estimated range</small><strong>${formatMiles(battery.range, true)}</strong><span>${battery.timeToFull ? escapeHTML(battery.timeToFull) : 'Based on current data'}</span></div>
+					<div class="halo-metric">${icon('battery')}<small>Estimated range</small><strong>${formatMiles(this.batteryRangeMiles(), true)}</strong><span>${escapeHTML(battery.timeToFull || this.rangeBasisLabel(this.batteryRangeEstimate().basis))}</span></div>
 					<div class="halo-metric">${icon('lock')}<small>Security</small><strong>${escapeHTML(secureLabel)}</strong><span>${security.last_updated ? `Updated ${escapeHTML(formatDate(security.last_updated, { hour: '2-digit', minute: '2-digit' }))}` : 'Tap for controls'}</span></div>
 					<div class="halo-metric">${icon('activity')}<small>Odometer</small><strong>${formatMiles(vehicle.odometer_miles ?? vehicle.current_mileage, true)}</strong><span>${vehicle.odometer_miles == null && vehicle.current_mileage == null ? 'Awaiting vehicle data' : 'Recorded distance'}</span></div>
 					<div class="halo-metric">${icon('service')}<small>Service</small><strong>${escapeHTML(vehicle.service?.status_label || vehicle.service?.status || 'No update')}</strong><span>${vehicle.service?.due_date ? `Due ${formatDate(vehicle.service.due_date)}` : 'View maintenance'}</span></div>
@@ -3535,7 +3773,7 @@
 			const colourLabel = vehicle.colour_label || vehicle.colour || vehicle.color || '';
 			const specRows = customerSpecificationRows(vehicle);
 			const specificationKicker = this.state.lifecycle === 'owner' ? 'AS BUILT' : 'YOUR BUILD';
-			container.innerHTML = `${this.homeHero({ label: vehicle.first_edition_number ? `FIRST EDITION ${vehicle.first_edition_number}` : 'YOUR AVENRÀ', title: this.vehicleName(), subtitle: [colourLabel, vehicle.registration || vehicle.registration_plate].filter(Boolean).join(' · '), value: battery.soc === null ? text(vehicle.status_label || vehicle.status, 'Linked to Halo') : `${Math.round(battery.soc)}%`, valueLabel: battery.soc === null ? 'Vehicle status' : `${formatMiles(battery.range, true)} estimated range`, action: this.state.lifecycle === 'owner' ? 'data-action="refresh-vehicle"' : 'data-vehicle-view="build"', actionLabel: this.state.lifecycle === 'owner' ? 'Refresh' : 'Build status', image: vehicle.image_url, fallbackImage: vehicle.fallback_image_url, canonicalImage: vehicle.colour_image_url, swatch: vehicle.colour_swatch, imageAlt: [this.vehicleName(), colourLabel].filter(Boolean).join(' — '), compact: true, productStage: !vehicle.has_private_photo, batteryValue: this.state.lifecycle === 'owner' })}
+			container.innerHTML = `${this.homeHero({ label: vehicle.first_edition_number ? `FIRST EDITION ${vehicle.first_edition_number}` : 'YOUR AVENRÀ', title: this.vehicleName(), subtitle: [colourLabel, vehicle.registration || vehicle.registration_plate].filter(Boolean).join(' · '), value: battery.soc === null ? text(vehicle.status_label || vehicle.status, 'Linked to Halo') : `${Math.round(battery.soc)}%`, valueLabel: battery.soc === null ? 'Vehicle status' : `${formatMiles(this.batteryRangeMiles(), true)} estimated range`, action: this.state.lifecycle === 'owner' ? 'data-action="refresh-vehicle"' : 'data-vehicle-view="build"', actionLabel: this.state.lifecycle === 'owner' ? 'Refresh' : 'Build status', image: vehicle.image_url, fallbackImage: vehicle.fallback_image_url, canonicalImage: vehicle.colour_image_url, swatch: vehicle.colour_swatch, imageAlt: [this.vehicleName(), colourLabel].filter(Boolean).join(' — '), compact: true, productStage: !vehicle.has_private_photo, batteryValue: this.state.lifecycle === 'owner' })}
 				<section class="halo-card"><div class="halo-card-header"><div><p class="halo-card-kicker">IDENTITY</p><h2>Vehicle details</h2></div><span class="halo-badge halo-badge--good">${escapeHTML(vehicle.status_label || (this.state.lifecycle === 'owner' ? 'Active' : 'Ordered'))}</span></div><dl class="halo-spec-list">
 					<div class="halo-spec-row"><dt>Model</dt><dd>${escapeHTML(this.vehicleName())}</dd></div>
 					<div class="halo-spec-row"><dt>Registration</dt><dd>${escapeHTML(vehicle.registration || vehicle.registration_plate || 'Not assigned')}</dd></div>
@@ -3556,7 +3794,7 @@
 					<section class="halo-card halo-hypercore-component halo-ecu-card" data-ecu-card>${this.ecuCardContentHTML()}</section>
 					<section class="halo-card halo-hypercore-component halo-bms-card" data-bms-card>${this.bmsCardContentHTML()}</section>
 				</div>
-				<section class="halo-card"><div class="halo-card-header"><div><p class="halo-card-kicker">RANGE</p><h2>Journey estimate</h2></div><span class="halo-badge">Estimate</span></div><dl class="halo-spec-list"><div class="halo-spec-row"><dt>Estimated range</dt><dd>${escapeHTML(formatMiles(battery.range, true))}</dd></div><div class="halo-spec-row"><dt>Starting charge for Ride mode</dt><dd data-bms-effective-start-charge>${escapeHTML(this.startingChargeLabel())}</dd></div></dl><p class="halo-helper">HyperCore BMS reports battery measurements, not dependable remaining mileage. Halo keeps range clearly labelled as an estimate.</p></section>`;
+				<section class="halo-card"><div class="halo-card-header"><div><p class="halo-card-kicker">RANGE</p><h2>Journey estimate</h2></div><span class="halo-badge">Estimate</span></div><dl class="halo-spec-list"><div class="halo-spec-row"><dt>Estimated range</dt><dd>${escapeHTML(formatMiles(this.batteryRangeMiles(), true))}</dd></div>${this.rangeDetailRows()}<div class="halo-spec-row"><dt>Starting charge for Ride mode</dt><dd data-bms-effective-start-charge>${escapeHTML(this.startingChargeLabel())}</dd></div></dl><p class="halo-helper">${escapeHTML(this.rangeBasisLabel(this.batteryRangeEstimate().basis))}. HyperCore BMS reports battery measurements, not dependable remaining mileage. Halo keeps range clearly labelled as an estimate.</p></section>`;
 		}
 
 		renderVehicleBuild(container) {
@@ -5825,6 +6063,7 @@
 					this.state.activeRide = { id: rideId, session, engineState, route, started_at: startedAt, freeRide: !route, mode: setup.mode, startSoc: setup.soc, rideMemories: memoryRecording, testRideMonitoring };
 					this.state.ecuRideWasLive = Boolean(this.state.ecu?.live);
 					this.state.bmsRideWasLive = Boolean(this.state.bms?.live);
+					this.state.rideEnergy = this.emptyRideEnergy();
 					this.renderHypercoreRideStatus();
 					this.state.testRideTracking = null;
 					this.renderTestRideMonitoringStatus();
@@ -6080,7 +6319,12 @@
 			if (maxLeanLeft) maxLeanLeft.textContent = `${Math.abs(Math.round(leanLeft || 0))}°`;
 			if (maxLeanRight) maxLeanRight.textContent = `${Math.abs(Math.round(leanRight || 0))}°`;
 			if (bestZeroToSixty) bestZeroToSixty.textContent = zeroToSixty === null || zeroToSixty <= 0 ? '—' : `${zeroToSixty.toFixed(2)} s`;
-			if (range) range.textContent = formatMiles(telemetry.range_miles ?? this.vehicleBattery().range, true);
+			if (range) range.textContent = formatMiles(telemetry.range_miles ?? this.batteryRangeMiles(), true);
+			const power = $('[data-ride-max-power]', root);
+			if (power) {
+				const energy = this.rideEnergySummary();
+				power.textContent = energy?.peakPowerKw === null || !energy ? '—' : `${formatNumber(energy.peakPowerKw, { maximumFractionDigits: 1 })} kW`;
+			}
 			this.captureRideMemoryTelemetry(telemetry);
 			/* Arrival, GPS and map position have dedicated event owners. Generic
 			 * telemetry arrives every 100 ms and must update the HUD only. */
@@ -6691,7 +6935,7 @@
 			const points = asArray(result.points || metrics.points);
 			const firstPoint = points[0] || {};
 			const lastPoint = points[points.length - 1] || {};
-			return {
+			return Object.assign({
 				client_ride_id: result.id || active.id,
 				started_at: result.startedAt || result.started_at || active.started_at,
 				ended_at: result.endedAt || result.ended_at || new Date().toISOString(),
@@ -6713,6 +6957,24 @@
 				vehicle_id: active.vehicleId || result.context?.vehicleId || this.state.vehicle?.id || null,
 				ride_mode: active.testRideMonitoring ? 'test' : (active.mode || result.context?.mode || result.context?.rideMode || null),
 				start_soc: active.startSoc ?? result.context?.soc ?? null
+			}, this.rideEnergyPayload());
+		}
+
+		/* Energy and power measured by the HyperCore BMS during this ride. Omitted
+		 * entirely when the BMS was not connected, so a GPS-only ride never
+		 * records a zero that looks like a measurement. */
+		rideEnergyPayload() {
+			const energy = this.rideEnergySummary();
+			if (!energy) return {};
+			this.state.lastRideEnergy = energy;
+			return {
+				energy_wh: energy.energyWh > 0 ? energy.energyWh : null,
+				energy_recovered_wh: energy.energyRecoveredWh > 0 ? energy.energyRecoveredWh : null,
+				efficiency_wh_per_mile: energy.efficiencyWhPerMile,
+				soc_used: energy.socUsed,
+				peak_power_kw: energy.peakPowerKw,
+				peak_current_a: energy.peakCurrentA,
+				peak_voltage_v: energy.peakVoltageV
 			};
 		}
 
@@ -6846,6 +7108,7 @@
 			this.state.activeRide = null;
 			this.state.ecuRideWasLive = false;
 			this.state.bmsRideWasLive = false;
+			this.state.rideEnergy = null;
 			const startSoc = $('#halo-route-form [name="start_soc"]', root);
 			if (startSoc) delete startSoc.dataset.userAdjusted;
 			this.syncRideSetup();
@@ -6870,11 +7133,43 @@
 				top_speed_mph: source.top_speed_mph ?? metrics.topSpeedMph,
 				max_lean_degrees: source.max_lean_degrees ?? Math.max(Number(source.max_lean_left ?? metrics.maxLeanLeft) || 0, Number(source.max_lean_right ?? metrics.maxLeanRight) || 0)
 			});
+				const measured = this.rideSummaryPerformanceMarkup(summary);
 				const memory = this.state.lastRideMemory;
 				const memoryNotice = memory
 					? `<article class="halo-callout" style="margin-top:16px">${icon('camera')}<div><h3>Ride Memories saved</h3><p>${escapeHTML(formatBytes(memory.bytes || 0))} of audio-free footage is stored privately on this device. Open Activity to review it.</p></div></article>`
 					: '';
-				this.openDialog('Ride complete', `<div class="halo-summary-grid"><div class="halo-summary-metric"><strong>${escapeHTML(formatMiles(summary.distance_miles, true))}</strong><small>Distance</small></div><div class="halo-summary-metric"><strong>${escapeHTML(formatDuration(summary.duration_seconds))}</strong><small>Time</small></div><div class="halo-summary-metric"><strong>${finite(summary.energy_kwh) === null ? '—' : `${formatNumber(summary.energy_kwh, { maximumFractionDigits: 1 })} kWh`}</strong><small>Energy</small></div></div>${finite(summary.top_speed_mph) === null && finite(summary.max_lean_degrees) === null ? '' : `<dl class="halo-spec-list" style="margin-top:16px"><div class="halo-spec-row"><dt>Top speed</dt><dd>${finite(summary.top_speed_mph) === null ? '—' : `${formatNumber(summary.top_speed_mph)} mph`}</dd></div><div class="halo-spec-row"><dt>Maximum lean</dt><dd>${finite(summary.max_lean_degrees) === null ? '—' : `${formatNumber(summary.max_lean_degrees)}°`}</dd></div></dl>`}${memoryNotice}<div class="halo-button-stack">${summary.id ? `<button type="button" class="halo-button halo-button--secondary halo-full-width" data-action="share-ride" data-share-ride-id="${escapeAttr(summary.id)}">Share ride</button>` : ''}<button type="button" class="halo-button halo-button--primary halo-full-width" data-route-target="activity" data-action="close-dialog">View activity</button></div>`, 'JOURNEY SAVED');
+				this.openDialog('Ride complete', `<div class="halo-summary-grid"><div class="halo-summary-metric"><strong>${escapeHTML(formatMiles(summary.distance_miles, true))}</strong><small>Distance</small></div><div class="halo-summary-metric"><strong>${escapeHTML(formatDuration(summary.duration_seconds))}</strong><small>Time</small></div><div class="halo-summary-metric"><strong>${finite(summary.energy_kwh) === null ? '—' : `${formatNumber(summary.energy_kwh, { maximumFractionDigits: 1 })} kWh`}</strong><small>Energy</small></div></div>${finite(summary.top_speed_mph) === null && finite(summary.max_lean_degrees) === null ? '' : `<dl class="halo-spec-list" style="margin-top:16px"><div class="halo-spec-row"><dt>Top speed</dt><dd>${finite(summary.top_speed_mph) === null ? '—' : `${formatNumber(summary.top_speed_mph)} mph`}</dd></div><div class="halo-spec-row"><dt>Maximum lean</dt><dd>${finite(summary.max_lean_degrees) === null ? '—' : `${formatNumber(summary.max_lean_degrees)}°`}</dd></div></dl>`}${measured}${memoryNotice}<div class="halo-button-stack">${summary.id ? `<button type="button" class="halo-button halo-button--secondary halo-full-width" data-action="share-ride" data-share-ride-id="${escapeAttr(summary.id)}">Share ride</button>` : ''}<button type="button" class="halo-button halo-button--primary halo-full-width" data-route-target="activity" data-action="close-dialog">View activity</button></div>`, 'JOURNEY SAVED');
+		}
+
+		/* Power and consumption measured by the HyperCore BMS. Shown only when the
+		 * BMS was connected for the ride; there is no estimate here. */
+		rideSummaryPerformanceMarkup(summary, options) {
+			const settings = Object.assign({ allowLiveFallback: true }, options || {});
+			const measured = settings.allowLiveFallback ? (this.state.lastRideEnergy || {}) : {};
+			const peakKw = finite(summary?.peak_power_kw) ?? finite(measured.peakPowerKw);
+			const peakAmps = finite(summary?.peak_current_a) ?? finite(measured.peakCurrentA);
+			const peakVolts = finite(summary?.peak_voltage_v) ?? finite(measured.peakVoltageV);
+			const efficiency = finite(summary?.efficiency_wh_per_mile) ?? finite(measured.efficiencyWhPerMile);
+			const recovered = finite(summary?.energy_recovered_wh) ?? finite(measured.energyRecoveredWh);
+			const weightKg = finite(measured.kerbWeightKg) || this.performanceProfile().kerbWeightKg;
+			if (peakKw === null && efficiency === null) return '';
+			const rows = [];
+			if (peakKw !== null) {
+				const record = haloPerformance.powerRecord(peakKw, weightKg);
+				rows.push(`<div class="halo-spec-row"><dt>Max power</dt><dd>${escapeHTML(formatNumber(record.kilowatts, { maximumFractionDigits: 1 }))} kW · ${escapeHTML(formatNumber(record.bhp, { maximumFractionDigits: 1 }))} bhp</dd></div>`);
+				if (record.bhpPerTonne !== null) rows.push(`<div class="halo-spec-row"><dt>Power to weight</dt><dd>${escapeHTML(formatNumber(record.bhpPerTonne, { maximumFractionDigits: 0 }))} bhp per tonne</dd></div>`);
+			}
+			if (peakAmps !== null) {
+				const atVolts = peakVolts === null ? '' : ` at ${formatNumber(peakVolts, { maximumFractionDigits: 1 })} V`;
+				rows.push(`<div class="halo-spec-row"><dt>Peak current</dt><dd>${escapeHTML(`${formatNumber(peakAmps, { maximumFractionDigits: 0 })} A${atVolts}`)}</dd></div>`);
+			}
+			if (efficiency !== null) {
+				rows.push(`<div class="halo-spec-row"><dt>Consumption</dt><dd>${escapeHTML(formatNumber(efficiency, { maximumFractionDigits: 0 }))} Wh per mile</dd></div>`);
+			}
+			if (recovered !== null && recovered > 0) {
+				rows.push(`<div class="halo-spec-row"><dt>Energy recovered</dt><dd>${escapeHTML(formatNumber(recovered, { maximumFractionDigits: 0 }))} Wh</dd></div>`);
+			}
+			return `<dl class="halo-spec-list" style="margin-top:16px">${rows.join('')}</dl><p class="halo-helper">Measured by HyperCore BMS${peakKw === null ? '' : ` · power to weight uses a ${formatNumber(weightKg, { maximumFractionDigits: 0 })} kg kerb weight and excludes rider and luggage`}.</p>`;
 		}
 
 		async flushRideQueue() {
@@ -8484,7 +8779,7 @@
 			const maxLean = finite(ride.max_lean_degrees) ?? Math.max(Number(ride.max_lean_left) || 0, Number(ride.max_lean_right) || 0);
 			await this.maps.destroy('ride-detail');
 			this.assertIdentityScope(scope);
-			this.openDialog(ride.title || ride.destination || ride.end_location || 'Ride detail', `<div id="halo-ride-detail-map" class="halo-map halo-ride-detail-map"><div class="halo-map-state" data-map-state><p>Loading route</p></div></div><div class="halo-summary-grid" style="margin-top:16px"><div class="halo-summary-metric"><strong>${escapeHTML(formatMiles(ride.distance_miles, true))}</strong><small>Distance</small></div><div class="halo-summary-metric"><strong>${escapeHTML(formatDuration(ride.duration_seconds))}</strong><small>Time</small></div><div class="halo-summary-metric"><strong>${energyKwh === null ? '—' : `${formatNumber(energyKwh, { maximumFractionDigits: 1 })} kWh`}</strong><small>Energy</small></div></div><dl class="halo-spec-list" style="margin-top:14px"><div class="halo-spec-row"><dt>Date</dt><dd>${escapeHTML(formatDate(ride.started_at || ride.date))}</dd></div><div class="halo-spec-row"><dt>Top speed</dt><dd>${finite(ride.top_speed_mph) === null ? '—' : `${formatNumber(ride.top_speed_mph)} mph`}</dd></div><div class="halo-spec-row"><dt>Maximum lean</dt><dd>${maxLean === null ? '—' : `${formatNumber(maxLean)}°`}</dd></div></dl><button type="button" class="halo-button halo-button--secondary halo-full-width" data-action="share-ride" data-share-ride-id="${escapeAttr(rideId)}">Share ride</button>`, 'JOURNEY');
+			this.openDialog(ride.title || ride.destination || ride.end_location || 'Ride detail', `<div id="halo-ride-detail-map" class="halo-map halo-ride-detail-map"><div class="halo-map-state" data-map-state><p>Loading route</p></div></div><div class="halo-summary-grid" style="margin-top:16px"><div class="halo-summary-metric"><strong>${escapeHTML(formatMiles(ride.distance_miles, true))}</strong><small>Distance</small></div><div class="halo-summary-metric"><strong>${escapeHTML(formatDuration(ride.duration_seconds))}</strong><small>Time</small></div><div class="halo-summary-metric"><strong>${energyKwh === null ? '—' : `${formatNumber(energyKwh, { maximumFractionDigits: 1 })} kWh`}</strong><small>Energy</small></div></div><dl class="halo-spec-list" style="margin-top:14px"><div class="halo-spec-row"><dt>Date</dt><dd>${escapeHTML(formatDate(ride.started_at || ride.date))}</dd></div><div class="halo-spec-row"><dt>Top speed</dt><dd>${finite(ride.top_speed_mph) === null ? '—' : `${formatNumber(ride.top_speed_mph)} mph`}</dd></div><div class="halo-spec-row"><dt>Maximum lean</dt><dd>${maxLean === null ? '—' : `${formatNumber(maxLean)}°`}</dd></div></dl>${this.rideSummaryPerformanceMarkup(ride, { allowLiveFallback: false })}<button type="button" class="halo-button halo-button--secondary halo-full-width" data-action="share-ride" data-share-ride-id="${escapeAttr(rideId)}">Share ride</button>`, 'JOURNEY');
 			const map = await this.maps.create('ride-detail', $('#halo-ride-detail-map', root), { mode: 'history', controls: false });
 			this.assertIdentityScope(scope);
 			if (map) await this.maps.call('ride-detail', ['showRoute', 'renderRoute'], [ride, { fit: true }]);

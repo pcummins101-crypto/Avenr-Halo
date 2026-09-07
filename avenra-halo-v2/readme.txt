@@ -4,7 +4,7 @@ Tags: avenra, halo, motorcycle, pwa, customer-portal
 Requires at least: 6.3
 Tested up to: 6.8
 Requires PHP: 8.0
-Stable tag: 2.7.5
+Stable tag: 2.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -22,6 +22,7 @@ The plugin provides:
 * Customer-specific transparent motorcycle artwork in the home hero, with the configured paint image and Silverstone Gloss Metallic Black as resilient fallbacks.
 * Vehicle, build, unified HyperCore, security, service and ride-profile views.
 * Optional, read-only HyperCore Bluetooth telemetry with the HyperCore ECU and HyperCore BMS shown together, including live charge, electrical, motor and thermal data where the phone exposes Web Bluetooth.
+* Range, consumption and recorded power derived from the battery pack's own measurements, with each range figure stating the evidence it rests on and remaining clearly labelled an estimate.
 * Route planning, map fallback states, community hazards and live ride recording with Avenrà's fixed +15% GPS speed calibration.
 * A stationary pre-ride camera alignment check with uncropped rear and front previews, centre guides, simultaneous dual-camera display where supported and an explicit one-camera-at-a-time fallback.
 * Ride-scoped WebToNative background-location hand-off with short-lived writer credentials, plus safe browser wake-lock fallback when no native bridge is present.
@@ -104,6 +105,13 @@ Browser-private storage is origin/profile scoped, not application-encrypted stor
 Halo Community is disabled until a rider explicitly joins. Its public identity is limited to a rider-chosen username and optional bio; customer identity, motorcycles, rides, locations, Emergency Assist information and ride-risk indicators are not exposed through Community. Direct messages are stored by Halo and are not end-to-end encrypted. See `docs/COMMUNITY.md` before launch.
 
 == Changelog ==
+
+= 2.8.0 =
+* Named the powertrain modules the way riders know them: Halo now says Avenrà BMS and Avenrà HyperCore ECU wherever it identifies the hardware. The phone's own Bluetooth chooser is drawn by the operating system and still shows the firmware name.
+* Added an estimated range built from the model's published full-charge figure (206 miles EVO, 103 miles ONE), refined by the pack's own remaining energy and, from two miles into a ride, by the consumption actually recorded. Each figure states the evidence it rests on and stays labelled an estimate.
+* Read the pack capacity, state of health and reported power that follow state of charge in the BMS status frame, and show energy in the pack and pack health alongside charge.
+* Measured ride energy from the pack's own remaining energy, filling the ride record's previously empty energy field and adding Wh per mile, energy recovered and charge used.
+* Recorded peak drive power for each ride with the current and voltage at that moment, shown as kW, bhp and bhp per tonne (170 kg kerb weight, excluding rider and luggage) on the live ride display, the ride summary and stored ride details.
 
 = 2.7.5 =
 * Aligned HyperCore BMS communication with the official ANT BMS app: Halo now sends the vendor status request (0xBE bytes, not 0xC8, which makes the BMS reply in a two-part frame Halo did not decode), accepts the 7E B1 91 status header, chooses the legacy or modern request from the unit's advertised name so a unit is never sent a request it does not understand, waits one second after notifications start, and reopens a silent link once on the same device before reporting No data.

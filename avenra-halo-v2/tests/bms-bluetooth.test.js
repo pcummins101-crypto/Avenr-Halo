@@ -39,6 +39,14 @@ function writeU16(bytes, position, value) {
 	bytes[position + 1] = (unsigned >>> 8) & 0xff;
 }
 
+function writeU32(bytes, position, value) {
+	const unsigned = Number(value) >>> 0;
+	bytes[position] = unsigned & 0xff;
+	bytes[position + 1] = (unsigned >>> 8) & 0xff;
+	bytes[position + 2] = (unsigned >>> 16) & 0xff;
+	bytes[position + 3] = (unsigned >>> 24) & 0xff;
+}
+
 function writeU16Be(bytes, position, value) {
 	const unsigned = Number(value) & 0xffff;
 	bytes[position] = (unsigned >>> 8) & 0xff;
@@ -920,4 +928,61 @@ test('reopens a silent link once on the same device without a second chooser', a
 	}
 	assert.equal(connects(), 2, 'a live link is never reopened');
 	await manager.disconnect('test-complete');
+});
+
+function makeCapacityFrame(options) {
+	const settings = Object.assign({
+		cells: Array.from({ length: 24 }, () => 3500),
+		temperatures: [20, 20],
+		packVoltageRaw: 7990,
+		currentRaw: 0,
+		socRaw: 86,
+		stateOfHealth: 98,
+		fullCapacityMicroAh: 60_000_000,
+		remainingCapacityMicroAh: 51_600_000,
+		cumulativeMilliAh: 1_234_000,
+		packPowerW: 0
+	}, options || {});
+	const frame = makeFrame(settings);
+	const tail = 34 + (settings.cells.length * 2) + (settings.temperatures.length * 2);
+	writeU16(frame, tail + 10, settings.stateOfHealth);
+	writeU32(frame, tail + 16, settings.fullCapacityMicroAh);
+	writeU32(frame, tail + 20, settings.remainingCapacityMicroAh);
+	writeU32(frame, tail + 24, settings.cumulativeMilliAh);
+	writeU32(frame, tail + 28, settings.packPowerW);
+	const crc = crc16Modbus(frame.subarray(1, frame.length - 4));
+	writeU16(frame, frame.length - 4, crc);
+	return frame;
+}
+
+test('reads the pack capacity accounting that follows state of charge', () => {
+	const reading = parseTelemetryFrame(makeCapacityFrame(), 1_700_000_000_000);
+	assert.equal(reading.soc, 86);
+	assert.equal(reading.voltage, 79.9);
+	assert.equal(reading.stateOfHealth, 98);
+	assert.equal(reading.fullCapacityAh, 60);
+	assert.equal(reading.remainingCapacityAh, 51.6);
+	assert.equal(reading.cumulativeAh, 1234);
+	// Remaining energy is the pack's own charge at its present voltage.
+	assert.equal(reading.remainingWh, 4122.8);
+	assert.equal(reading.fullCapacityWh, 4794);
+});
+
+test('reads a signed pack power and keeps the computed value independent', () => {
+	const reading = parseTelemetryFrame(makeCapacityFrame({ packPowerW: -2400, currentRaw: 0x10000 - 300 }), 1_700_000_000_000);
+	assert.equal(reading.reportedPowerKw, -2.4);
+	assert.equal(reading.current, -30);
+	assert.equal(reading.powerKw, Number((79.9 * -30 / 1000).toFixed(3)), 'the displayed power stays voltage times current');
+});
+
+test('a frame without the capacity block still decodes, reporting nothing it did not receive', () => {
+	const reading = parseTelemetryFrame(makeFrame(), 1_700_000_000_000);
+	assert.equal(reading.soc, 87);
+	assert.equal(reading.remainingCapacityAh, 0);
+	assert.equal(reading.remainingWh, 0);
+	assert.equal(reading.stateOfHealth, 0);
+	const legacy = parseLegacyTelemetryFrame(makeLegacyFrame(), 1_700_000_000_000);
+	assert.equal(legacy.remainingWh, null, 'the legacy frame carries no capacity accounting');
+	assert.equal(legacy.stateOfHealth, null);
+	assert.equal(legacy.reportedPowerKw, null);
 });

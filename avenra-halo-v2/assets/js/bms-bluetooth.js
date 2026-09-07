@@ -102,6 +102,18 @@
 		return value >= 0x8000 ? value - 0x10000 : value;
 	}
 
+	function readUnsignedInt32(bytes, position) {
+		return ((bytes[position])
+			+ (bytes[position + 1] * 0x100)
+			+ (bytes[position + 2] * 0x10000)
+			+ (bytes[position + 3] * 0x1000000));
+	}
+
+	function readSignedInt32(bytes, position) {
+		const value = readUnsignedInt32(bytes, position);
+		return value > 0x7fffffff ? value - 0x100000000 : value;
+	}
+
 	function readSignedInt32Be(bytes, position) {
 		const value = ((bytes[position] * 0x1000000)
 			+ (bytes[position + 1] << 16)
@@ -171,6 +183,24 @@
 
 		const stateOfCharge = readUnsignedInt16(frame, tailPosition + 8);
 		if (stateOfCharge > 100) throw new Error('The BMS state of charge is outside its valid bounds.');
+
+		/* The status frame continues past state of charge with the pack's energy
+		 * accounting. These fields are what the vendor app uses for its capacity
+		 * readouts; Halo uses them for a measured range estimate rather than one
+		 * derived from state of charge alone. Each is optional: a shorter frame,
+		 * or a value outside its physical bounds, simply leaves it null. */
+		const bounded = (value, minimum, maximum) => (Number.isFinite(value) && value >= minimum && value <= maximum ? value : null);
+		const has = (offset) => frame.length >= tailPosition + offset;
+		const stateOfHealth = has(12) ? bounded(readUnsignedInt16(frame, tailPosition + 10), 0, 100) : null;
+		const fullCapacityAh = has(20) ? bounded(readUnsignedInt32(frame, tailPosition + 16) / 1e6, 0, 2000) : null;
+		const remainingCapacityAh = has(24) ? bounded(readUnsignedInt32(frame, tailPosition + 20) / 1e6, 0, 2000) : null;
+		const cumulativeAh = has(28) ? bounded(readUnsignedInt32(frame, tailPosition + 24) / 1000, 0, 1e6) : null;
+		const reportedPowerW = has(32) ? bounded(readSignedInt32(frame, tailPosition + 28), -300000, 300000) : null;
+		// Remaining energy is the pack's own remaining charge at its present
+		// voltage. It is the honest basis for a range estimate.
+		const remainingWh = remainingCapacityAh === null ? null : Number((remainingCapacityAh * packVoltage).toFixed(1));
+		const fullCapacityWh = fullCapacityAh === null ? null : Number((fullCapacityAh * packVoltage).toFixed(1));
+
 		const minCellVoltage = Math.min(...cellVoltages);
 		const maxCellVoltage = Math.max(...cellVoltages);
 		const maxTemperature = temperatures.length ? Math.max(...temperatures) : null;
@@ -192,6 +222,13 @@
 			minCellVoltage: Number(minCellVoltage.toFixed(3)),
 			maxCellVoltage: Number(maxCellVoltage.toFixed(3)),
 			cellDeltaMv: minCellVoltage > 0.1 ? Math.round((maxCellVoltage - minCellVoltage) * 1000) : 0,
+			stateOfHealth,
+			fullCapacityAh,
+			remainingCapacityAh,
+			cumulativeAh,
+			remainingWh,
+			fullCapacityWh,
+			reportedPowerKw: reportedPowerW === null ? null : Number((reportedPowerW / 1000).toFixed(3)),
 			measuredAt: nowIso(measuredAtMs),
 			measuredAtMs
 		};
@@ -250,6 +287,14 @@
 			minCellVoltage: Number(minCellVoltage.toFixed(3)),
 			maxCellVoltage: Number(maxCellVoltage.toFixed(3)),
 			cellDeltaMv: minCellVoltage > 0.1 ? Math.round((maxCellVoltage - minCellVoltage) * 1000) : 0,
+			// The legacy frame carries no capacity accounting.
+			stateOfHealth: null,
+			fullCapacityAh: null,
+			remainingCapacityAh: null,
+			cumulativeAh: null,
+			remainingWh: null,
+			fullCapacityWh: null,
+			reportedPowerKw: null,
 			measuredAt: nowIso(measuredAtMs),
 			measuredAtMs
 		};

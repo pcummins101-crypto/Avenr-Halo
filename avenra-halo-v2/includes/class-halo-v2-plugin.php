@@ -257,13 +257,14 @@ final class Avenra_Halo_V2_Plugin {
 		wp_enqueue_script( 'avenra-halo-v2-ride-focus', AVENRA_HALO_V2_URL . 'assets/js/ride-focus.js', array(), AVENRA_HALO_V2_VERSION, true );
 		wp_enqueue_script( 'avenra-halo-v2-webtonative-sdk', AVENRA_HALO_V2_URL . 'assets/vendor/webtonative/webtonative-1.0.63.min.js', array(), '1.0.63', true );
 		wp_enqueue_script( 'avenra-halo-v2-webtonative-ride', AVENRA_HALO_V2_URL . 'assets/js/webtonative-ride.js', array( 'avenra-halo-v2-webtonative-sdk' ), AVENRA_HALO_V2_VERSION, true );
+		wp_enqueue_script( 'avenra-halo-v2-performance', AVENRA_HALO_V2_URL . 'assets/js/performance.js', array(), AVENRA_HALO_V2_VERSION, true );
 		wp_enqueue_script( 'avenra-halo-v2-bms-bluetooth', AVENRA_HALO_V2_URL . 'assets/js/bms-bluetooth.js', array(), AVENRA_HALO_V2_VERSION, true );
 		wp_enqueue_script( 'avenra-halo-v2-hypercore-ecu', AVENRA_HALO_V2_URL . 'assets/js/hypercore-ecu.js', array(), AVENRA_HALO_V2_VERSION, true );
 		wp_enqueue_script( 'avenra-halo-v2-vehicle-specification', AVENRA_HALO_V2_URL . 'assets/js/vehicle-specification.js', array(), AVENRA_HALO_V2_VERSION, true );
 		wp_enqueue_script( 'avenra-halo-v2-camera-alignment', AVENRA_HALO_V2_URL . 'assets/js/camera-alignment.js', array(), AVENRA_HALO_V2_VERSION, true );
 		wp_enqueue_script( 'avenra-halo-v2-incident-camera', AVENRA_HALO_V2_URL . 'assets/js/incident-camera.js', array(), AVENRA_HALO_V2_VERSION, true );
 		wp_enqueue_script( 'avenra-halo-v2-ride-memories', AVENRA_HALO_V2_URL . 'assets/js/ride-memories.js', array(), AVENRA_HALO_V2_VERSION, true );
-		wp_enqueue_script( 'avenra-halo-v2-app', AVENRA_HALO_V2_URL . 'assets/js/app.js', array( 'avenra-halo-v2-map', 'avenra-halo-v2-ride', 'avenra-halo-v2-ride-focus', 'avenra-halo-v2-webtonative-ride', 'avenra-halo-v2-bms-bluetooth', 'avenra-halo-v2-hypercore-ecu', 'avenra-halo-v2-vehicle-specification', 'avenra-halo-v2-camera-alignment', 'avenra-halo-v2-incident-camera', 'avenra-halo-v2-ride-memories' ), AVENRA_HALO_V2_VERSION, true );
+		wp_enqueue_script( 'avenra-halo-v2-app', AVENRA_HALO_V2_URL . 'assets/js/app.js', array( 'avenra-halo-v2-map', 'avenra-halo-v2-ride', 'avenra-halo-v2-ride-focus', 'avenra-halo-v2-webtonative-ride', 'avenra-halo-v2-performance', 'avenra-halo-v2-bms-bluetooth', 'avenra-halo-v2-hypercore-ecu', 'avenra-halo-v2-vehicle-specification', 'avenra-halo-v2-camera-alignment', 'avenra-halo-v2-incident-camera', 'avenra-halo-v2-ride-memories' ), AVENRA_HALO_V2_VERSION, true );
 
 		$config = $this->client_config();
 		wp_localize_script( 'avenra-halo-v2-app', 'AvenraHaloV2Config', $config );
@@ -317,6 +318,18 @@ final class Avenra_Halo_V2_Plugin {
 				'one'     => esc_url_raw( (string) apply_filters( 'avenra_halo_v2_profile_mark_one', AVENRA_HALO_V2_PROFILE_MARK_ONE ) ),
 			),
 			'canonicalRangeImage' => esc_url_raw( (string) apply_filters( 'avenra_halo_v2_range_image', AVENRA_HALO_V2_RANGE_IMAGE ) ),
+			/**
+			 * Manufacturer figures used to turn a HyperCore BMS state of charge into
+			 * an estimated range, and to express recorded power per tonne. These are
+			 * nominal full-charge figures, not a promise of real-world range.
+			 */
+			'performance'    => array(
+				'fullRangeMiles' => array(
+					'evo' => max( 0.0, (float) apply_filters( 'avenra_halo_v2_full_range_miles_evo', 206 ) ),
+					'one' => max( 0.0, (float) apply_filters( 'avenra_halo_v2_full_range_miles_one', 103 ) ),
+				),
+				'kerbWeightKg'   => max( 1.0, (float) apply_filters( 'avenra_halo_v2_kerb_weight_kg', 170 ) ),
+			),
 			'links'          => $links,
 			'locale'        => determine_locale(),
 			'units'         => 'imperial',
@@ -369,7 +382,7 @@ final class Avenra_Halo_V2_Plugin {
 	}
 
 	public function defer_scripts( string $tag, string $handle, string $src ): string {
-		if ( in_array( $handle, array( 'avenra-halo-v2-map', 'avenra-halo-v2-ride', 'avenra-halo-v2-ride-focus', 'avenra-halo-v2-webtonative-sdk', 'avenra-halo-v2-webtonative-ride', 'avenra-halo-v2-bms-bluetooth', 'avenra-halo-v2-hypercore-ecu', 'avenra-halo-v2-vehicle-specification', 'avenra-halo-v2-camera-alignment', 'avenra-halo-v2-incident-camera', 'avenra-halo-v2-ride-memories', 'avenra-halo-v2-app' ), true ) && ! str_contains( $tag, ' defer' ) ) {
+		if ( in_array( $handle, array( 'avenra-halo-v2-map', 'avenra-halo-v2-ride', 'avenra-halo-v2-ride-focus', 'avenra-halo-v2-webtonative-sdk', 'avenra-halo-v2-webtonative-ride', 'avenra-halo-v2-performance', 'avenra-halo-v2-bms-bluetooth', 'avenra-halo-v2-hypercore-ecu', 'avenra-halo-v2-vehicle-specification', 'avenra-halo-v2-camera-alignment', 'avenra-halo-v2-incident-camera', 'avenra-halo-v2-ride-memories', 'avenra-halo-v2-app' ), true ) && ! str_contains( $tag, ' defer' ) ) {
 			return str_replace( ' src=', ' defer src=', $tag );
 		}
 		return $tag;
@@ -564,6 +577,7 @@ final class Avenra_Halo_V2_Plugin {
 			AVENRA_HALO_V2_URL . 'assets/js/ride-focus.js?ver=' . $version,
 			AVENRA_HALO_V2_URL . 'assets/vendor/webtonative/webtonative-1.0.63.min.js?ver=1.0.63',
 			AVENRA_HALO_V2_URL . 'assets/js/webtonative-ride.js?ver=' . $version,
+			AVENRA_HALO_V2_URL . 'assets/js/performance.js?ver=' . $version,
 			AVENRA_HALO_V2_URL . 'assets/js/bms-bluetooth.js?ver=' . $version,
 			AVENRA_HALO_V2_URL . 'assets/js/hypercore-ecu.js?ver=' . $version,
 			AVENRA_HALO_V2_URL . 'assets/js/vehicle-specification.js?ver=' . $version,

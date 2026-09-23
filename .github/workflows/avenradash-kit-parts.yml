@@ -1,0 +1,38 @@
+name: AvenraDash kit parts
+on:
+  push:
+    branches: ['build/avenradash-0.2.0-toolchain']
+    paths: ['.github/workflows/avenradash-kit-parts.yml']
+permissions:
+  actions: read
+  contents: read
+jobs:
+  parts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: avenradash-offline-kit
+          run-id: 35927204759
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/kit
+      - run: split -b 400M /tmp/kit/avenradash-offline-kit.tgz /tmp/kit/part-
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dash-kit-aa
+          path: /tmp/kit/part-aa
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dash-kit-ab
+          path: /tmp/kit/part-ab
+          retention-days: 1
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dash-kit-ac
+          path: /tmp/kit/part-ac
+          retention-days: 1
+          compression-level: 0
